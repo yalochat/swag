@@ -768,6 +768,9 @@ func (p *Parser) ParseDefinitionV3(typeSpecDef *TypeSpecDef) (*SchemaV3, error) 
 // fillDefinitionDescription additionally fills fields in definition (spec.Schema)
 // TODO: If .go file contains many types, it may work for a long time
 func fillDefinitionDescriptionV3(parser *Parser, definition *spec.Schema, file *ast.File, typeSpecDef *TypeSpecDef) {
+	if file == nil {
+		return
+	}
 	for _, astDeclaration := range file.Decls {
 		generalDeclaration, ok := astDeclaration.(*ast.GenDecl)
 		if !ok || generalDeclaration.Tok != token.TYPE {
