@@ -496,7 +496,7 @@ func (operation *Operation) parseParamAttribute(comment, objectType, schemaType,
 		case collectionFormatTag:
 			err = setCollectionFormatParam(param, attrKey, objectType, attr, comment)
 		case inCodeExampleTag:
-			err = setCodeExample(astFile, param, attr)
+			err = setExampleByInstance(astFile, param, attr)
 		}
 
 		if err != nil {
@@ -553,7 +553,7 @@ func resolveIdentValue(identName string, file *ast.File) interface{} {
 	return value
 }
 
-func setCodeExample(astFile *ast.File, param *spec.Parameter, attr string) error {
+func setExampleByInstance(astFile *ast.File, param *spec.Parameter, attr string) error {
 	if astFile == nil || param == nil {
 		return fmt.Errorf("astFile and param cannot be nil")
 	}
