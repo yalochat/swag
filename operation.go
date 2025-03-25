@@ -598,6 +598,25 @@ func parseCompositeLiteral(literal *ast.CompositeLit, file *ast.File) interface{
 		return arr
 	}
 
+	// Handle maps
+	if _, ok := literal.Type.(*ast.MapType); ok {
+		obj := make(map[string]interface{})
+		for _, elt := range literal.Elts {
+			if kv, ok := elt.(*ast.KeyValueExpr); ok {
+				key := parseExpr(kv.Key, file)
+				value := parseExpr(kv.Value, file)
+
+				// Ensure key is a string (convert if needed)
+				keyStr, ok := key.(string)
+				if !ok {
+					keyStr = fmt.Sprintf("%v", key) // Convert to string
+				}
+				obj[keyStr] = value
+			}
+		}
+		return obj
+	}
+
 	// Handle struct literals: {Key: Value}
 	obj := make(map[string]interface{})
 	for _, elt := range literal.Elts {
