@@ -519,7 +519,13 @@ func parseExpr(expr ast.Expr, file *ast.File) interface{} {
 		}
 		return nil
 	case *ast.Ident:
-		// Handle variable references
+		// Handle boolean literals (true/false)
+		if v.Name == "true" {
+			return true
+		} else if v.Name == "false" {
+			return false
+		}
+		//Handle variable references
 		return resolveIdentValue(v.Name, file)
 	default:
 		return nil // Unsupported type
@@ -560,6 +566,7 @@ func setCodeExample(astFile *ast.File, param *spec.Parameter, attr string) error
 	}
 
 	param.Example = example
+	log.Println("CCCCCCCCCCCCCCC")
 	return nil
 }
 

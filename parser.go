@@ -1188,7 +1188,7 @@ func getFuncDoc(decl any) (*ast.CommentGroup, bool) {
 		return astDecl.Doc, ok
 	case *ast.ValueSpec:
 		value, ok := astDecl.Values[0].(*ast.Ident)
-		if !ok || value == nil {
+		if !ok || value == nil || value.Obj == nil {
 			return nil, false
 		}
 		_, ok = getFuncDoc(value.Obj.Decl)
