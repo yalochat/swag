@@ -507,20 +507,44 @@ func (operation *Operation) parseParamAttribute(comment, objectType, schemaType,
 	return nil
 }
 
-func parseExpr(expr ast.Expr) interface{} {
+func parseExpr(expr ast.Expr, file *ast.File) interface{} {
 	switch v := expr.(type) {
 	case *ast.BasicLit:
 		return parseBasicLiteral(v)
 	case *ast.CompositeLit:
-		return parseCompositeLiteral(v) // Nested structs or arrays
+		return parseCompositeLiteral(v, file) // Nested structs or arrays
 	case *ast.UnaryExpr:
 		if v.Op == token.AND {
-			return parseExpr(v.X) // Dereference and parse the value
+			return parseExpr(v.X, file) // Dereference and parse the value
 		}
 		return nil
+	case *ast.Ident:
+		// Handle variable references
+		return resolveIdentValue(v.Name, file)
 	default:
 		return nil // Unsupported type
 	}
+}
+
+func resolveIdentValue(identName string, file *ast.File) interface{} {
+	var value interface{}
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		decl, ok := n.(*ast.ValueSpec)
+		if !ok {
+			return true
+		}
+
+		for i, name := range decl.Names {
+			if name.Name == identName && len(decl.Values) > i {
+				value = parseExpr(decl.Values[i], file)
+				return false // Stop walking
+			}
+		}
+		return true
+	})
+
+	return value
 }
 
 func setCodeExample(astFile *ast.File, param *spec.Parameter, attr string) error {
@@ -529,21 +553,7 @@ func setCodeExample(astFile *ast.File, param *spec.Parameter, attr string) error
 	}
 
 	// Walk through the AST to find the declaration of `attr`
-	var example interface{}
-	ast.Inspect(astFile, func(node ast.Node) bool {
-		decl, ok := node.(*ast.ValueSpec)
-		if !ok {
-			return true
-		}
-
-		for i, name := range decl.Names {
-			if name.Name == attr && len(decl.Values) > i {
-				example = parseExpr(decl.Values[i])
-				return false // Stop walking
-			}
-		}
-		return true
-	})
+	example := resolveIdentValue(attr, astFile)
 
 	if example == nil {
 		return fmt.Errorf("example instance not found or unsupported type")
@@ -566,7 +576,7 @@ func parseBasicLiteral(literal *ast.BasicLit) interface{} {
 	}
 }
 
-func parseCompositeLiteral(literal *ast.CompositeLit) interface{} {
+func parseCompositeLiteral(literal *ast.CompositeLit, file *ast.File) interface{} {
 	// Handle array and struct examples
 	if _, ok := literal.Type.(*ast.ArrayType); ok {
 		var arr []interface{}
@@ -575,20 +585,18 @@ func parseCompositeLiteral(literal *ast.CompositeLit) interface{} {
 			case *ast.BasicLit:
 				arr = append(arr, parseBasicLiteral(v))
 			case *ast.CompositeLit:
-				arr = append(arr, parseCompositeLiteral(v))
+				arr = append(arr, parseCompositeLiteral(v, file))
 			}
 		}
 		return arr
 	}
-
-	log.Println("AQUUUUIII")
 
 	// Handle struct literals: {Key: Value}
 	obj := make(map[string]interface{})
 	for _, elt := range literal.Elts {
 		if kv, ok := elt.(*ast.KeyValueExpr); ok {
 			if key, ok := kv.Key.(*ast.Ident); ok {
-				obj[key.Name] = parseExpr(kv.Value)
+				obj[key.Name] = parseExpr(kv.Value, file)
 			}
 		}
 	}
