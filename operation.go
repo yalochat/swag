@@ -403,7 +403,7 @@ func (operation *Operation) ParseParamComment(commentLine string, astFile *ast.F
 		return fmt.Errorf("not supported paramType: %s", paramType)
 	}
 
-	err := operation.parseParamAttribute(commentLine, objectType, refType, paramType, &param)
+	err := operation.parseParamAttribute(commentLine, objectType, refType, paramType, &param, astFile)
 
 	if err != nil {
 		return err
@@ -437,6 +437,7 @@ const (
 	collectionFormatTag = "collectionFormat"
 	patternTag          = "pattern"
 	oneOfTag            = "oneOf"
+	inCodeExampleTag    = "inCodeExample"
 )
 
 var regexAttributes = map[string]*regexp.Regexp{
@@ -462,9 +463,11 @@ var regexAttributes = map[string]*regexp.Regexp{
 	exampleTag: regexp.MustCompile(`(?i)\s+example\(.*\)`),
 	// schemaExample(0)
 	schemaExampleTag: regexp.MustCompile(`(?i)\s+schemaExample\(.*\)`),
+	// inCodeExample(instance)
+	inCodeExampleTag: regexp.MustCompile(`(?i)\s+inCodeExample\(.*\)`),
 }
 
-func (operation *Operation) parseParamAttribute(comment, objectType, schemaType, paramType string, param *spec.Parameter) error {
+func (operation *Operation) parseParamAttribute(comment, objectType, schemaType, paramType string, param *spec.Parameter, astFile *ast.File) error {
 	schemaType = TransToValidSchemeType(schemaType)
 
 	for attrKey, re := range regexAttributes {
@@ -492,11 +495,96 @@ func (operation *Operation) parseParamAttribute(comment, objectType, schemaType,
 			param.Extensions = setExtensionParam(attr)
 		case collectionFormatTag:
 			err = setCollectionFormatParam(param, attrKey, objectType, attr, comment)
+		case inCodeExampleTag:
+			err = setCodeExample(astFile, param, attr)
 		}
 
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func setCodeExample(astFile *ast.File, param *spec.Parameter, attr string) error {
+	if astFile == nil || param == nil {
+		return fmt.Errorf("astFile and param cannot be nil")
+	}
+
+	// Walk through the AST to find the declaration of `attr`
+	var example interface{}
+	ast.Inspect(astFile, func(node ast.Node) bool {
+		decl, ok := node.(*ast.ValueSpec)
+		if !ok {
+			return true
+		}
+
+		for i, name := range decl.Names {
+			if name.Name == attr && len(decl.Values) > i {
+				log.Println("name.Name", name.Name)
+				log.Println("attr", attr)
+				switch v := decl.Values[i].(type) {
+				case *ast.BasicLit:
+					example = parseBasicLiteral(v)
+				case *ast.CompositeLit:
+					example = parseCompositeLiteral(v)
+				}
+				return false // Stop walking
+			}
+		}
+		return true
+	})
+
+	if example == nil {
+		return fmt.Errorf("example instance not found or unsupported type")
+	}
+
+	param.Example = example
+	return nil
+}
+
+func parseBasicLiteral(literal *ast.BasicLit) interface{} {
+	switch literal.Kind {
+	case token.INT:
+		return literal.Value
+	case token.FLOAT:
+		return literal.Value
+	case token.STRING:
+		return literal.Value[1 : len(literal.Value)-1] // Remove quotes
+	default:
+		return nil
+	}
+}
+
+func parseCompositeLiteral(literal *ast.CompositeLit) interface{} {
+	// Handle array and struct examples
+	if _, ok := literal.Type.(*ast.ArrayType); ok {
+		var arr []interface{}
+		for _, elem := range literal.Elts {
+			switch v := elem.(type) {
+			case *ast.BasicLit:
+				arr = append(arr, parseBasicLiteral(v))
+			case *ast.CompositeLit:
+				arr = append(arr, parseCompositeLiteral(v))
+			}
+		}
+		return arr
+	}
+
+	log.Println("AQUUUUIII")
+	if _, ok := literal.Type.(*ast.StructType); ok {
+		obj := make(map[string]interface{})
+		for _, element := range literal.Elts {
+			if keyValueExpr, ok := element.(*ast.KeyValueExpr); ok {
+				if key, ok := keyValueExpr.Key.(*ast.Ident); ok {
+					if val, ok := keyValueExpr.Value.(*ast.BasicLit); ok {
+						obj[key.Name] = parseBasicLiteral(val)
+					}
+				}
+			}
+		}
+		return obj
 	}
 
 	return nil
