@@ -566,7 +566,6 @@ func setCodeExample(astFile *ast.File, param *spec.Parameter, attr string) error
 	}
 
 	param.Example = example
-	log.Println("CCCCCCCCCCCCCCC")
 	return nil
 }
 
