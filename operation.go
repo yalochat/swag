@@ -507,6 +507,22 @@ func (operation *Operation) parseParamAttribute(comment, objectType, schemaType,
 	return nil
 }
 
+func parseExpr(expr ast.Expr) interface{} {
+	switch v := expr.(type) {
+	case *ast.BasicLit:
+		return parseBasicLiteral(v)
+	case *ast.CompositeLit:
+		return parseCompositeLiteral(v) // Nested structs or arrays
+	case *ast.UnaryExpr:
+		if v.Op == token.AND {
+			return parseExpr(v.X) // Dereference and parse the value
+		}
+		return nil
+	default:
+		return nil // Unsupported type
+	}
+}
+
 func setCodeExample(astFile *ast.File, param *spec.Parameter, attr string) error {
 	if astFile == nil || param == nil {
 		return fmt.Errorf("astFile and param cannot be nil")
@@ -522,14 +538,7 @@ func setCodeExample(astFile *ast.File, param *spec.Parameter, attr string) error
 
 		for i, name := range decl.Names {
 			if name.Name == attr && len(decl.Values) > i {
-				log.Println("name.Name", name.Name)
-				log.Println("attr", attr)
-				switch v := decl.Values[i].(type) {
-				case *ast.BasicLit:
-					example = parseBasicLiteral(v)
-				case *ast.CompositeLit:
-					example = parseCompositeLiteral(v)
-				}
+				example = parseExpr(decl.Values[i])
 				return false // Stop walking
 			}
 		}
@@ -573,21 +582,18 @@ func parseCompositeLiteral(literal *ast.CompositeLit) interface{} {
 	}
 
 	log.Println("AQUUUUIII")
-	if _, ok := literal.Type.(*ast.StructType); ok {
-		obj := make(map[string]interface{})
-		for _, element := range literal.Elts {
-			if keyValueExpr, ok := element.(*ast.KeyValueExpr); ok {
-				if key, ok := keyValueExpr.Key.(*ast.Ident); ok {
-					if val, ok := keyValueExpr.Value.(*ast.BasicLit); ok {
-						obj[key.Name] = parseBasicLiteral(val)
-					}
-				}
+
+	// Handle struct literals: {Key: Value}
+	obj := make(map[string]interface{})
+	for _, elt := range literal.Elts {
+		if kv, ok := elt.(*ast.KeyValueExpr); ok {
+			if key, ok := kv.Key.(*ast.Ident); ok {
+				obj[key.Name] = parseExpr(kv.Value)
 			}
 		}
-		return obj
 	}
 
-	return nil
+	return obj
 }
 
 func findAttr(re *regexp.Regexp, commentLine string) (string, error) {
