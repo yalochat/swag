@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/swaggo/swag/v2/testdata/enums/consts"
+	"github.com/yalochat/swag/v2/testdata/enums/consts"
 )
 
 type Class int
@@ -13,11 +13,11 @@ const (
 	C
 	D = C + 1
 	F = Class(5)
-	//G is not enum
+	// G is not enum
 	G = H + 10
-	//H is not enum
+	// H is not enum
 	H = 10
-	//I is not enum
+	// I is not enum
 	I = int(F + 2)
 )
 

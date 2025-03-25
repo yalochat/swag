@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/swaggo/swag/v2/testdata/nested2"
+	"github.com/yalochat/swag/v2/testdata/nested2"
 )
 
 type Foo struct {
@@ -25,6 +25,6 @@ type Bar struct {
 // @Success 200 {object} api.Foo
 // @Router /testapi/get-foo [get]
 func GetFoo(w http.ResponseWriter, r *http.Request) {
-	//write your code
+	// write your code
 	var _ = Foo{}
 }

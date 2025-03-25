@@ -2177,18 +2177,19 @@ func TestParseTypeOverrides(t *testing.T) {
 
 	searchDir := "testdata/global_override"
 	p := New(SetOverrides(map[string]string{
-		"github.com/swaggo/swag/v2/testdata/global_override/types.Application":  "string",
-		"github.com/swaggo/swag/v2/testdata/global_override/types.Application2": "github.com/swaggo/swag/v2/testdata/global_override/othertypes.Application",
-		"github.com/swaggo/swag/v2/testdata/global_override/types.ShouldSkip":   "",
+		"github.com/yalochat/swag/v2/testdata/global_override/types.Application":  "string",
+		"github.com/yalochat/swag/v2/testdata/global_override/types.Application2": "github.com/yalochat/swag/v2/testdata/global_override/othertypes.Application",
+		"github.com/yalochat/swag/v2/testdata/global_override/types.ShouldSkip":   "",
 	}))
 	err := p.ParseAPI(searchDir, mainAPIFile, defaultParseDepth)
 	assert.NoError(t, err)
 
 	expected, err := os.ReadFile(filepath.Join(searchDir, "expected.json"))
 	assert.NoError(t, err)
+	expected = bytes.TrimSpace(expected)
 
 	b, _ := json.MarshalIndent(p.swagger, "", "    ")
-	//windows will fail: \r\n \n
+	// windows will fail: \r\n \n
 	assert.Equal(t, string(expected), string(b))
 }
 
@@ -2259,6 +2260,7 @@ func TestParseConflictSchemaName(t *testing.T) {
 	b, _ := json.MarshalIndent(p.swagger, "", "    ")
 	expected, err := os.ReadFile(filepath.Join(searchDir, "expected.json"))
 	assert.NoError(t, err)
+	expected = bytes.TrimSpace(expected)
 	assert.Equal(t, string(expected), string(b))
 }
 
@@ -2269,7 +2271,7 @@ func TestParseExternalModels(t *testing.T) {
 	err := p.ParseAPI(searchDir, mainAPIFile, defaultParseDepth)
 	assert.NoError(t, err)
 	b, _ := json.MarshalIndent(p.swagger, "", "    ")
-	//ioutil.WriteFile("./testdata/external_models/main/expected.json",b,0777)
+	// ioutil.WriteFile("./testdata/external_models/main/expected.json",b,0777)
 	expected, err := os.ReadFile(filepath.Join(searchDir, "expected.json"))
 	assert.NoError(t, err)
 	assert.Equal(t, string(expected), string(b))
@@ -4288,21 +4290,21 @@ func TestParser_skipPackageByPrefix(t *testing.T) {
 
 	parser := New()
 
-	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag"))
-	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/cmd"))
-	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/gen"))
+	assert.False(t, parser.skipPackageByPrefix("github.com/yalochat/swag"))
+	assert.False(t, parser.skipPackageByPrefix("github.com/yalochat/swag/cmd"))
+	assert.False(t, parser.skipPackageByPrefix("github.com/yalochat/swag/gen"))
 
-	parser = New(SetPackagePrefix("github.com/swaggo/swag/cmd"))
+	parser = New(SetPackagePrefix("github.com/yalochat/swag/cmd"))
 
-	assert.True(t, parser.skipPackageByPrefix("github.com/swaggo/swag"))
-	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/cmd"))
-	assert.True(t, parser.skipPackageByPrefix("github.com/swaggo/swag/gen"))
+	assert.True(t, parser.skipPackageByPrefix("github.com/yalochat/swag"))
+	assert.False(t, parser.skipPackageByPrefix("github.com/yalochat/swag/cmd"))
+	assert.True(t, parser.skipPackageByPrefix("github.com/yalochat/swag/gen"))
 
-	parser = New(SetPackagePrefix("github.com/swaggo/swag/cmd,github.com/swaggo/swag/gen"))
+	parser = New(SetPackagePrefix("github.com/yalochat/swag/cmd,github.com/yalochat/swag/gen"))
 
-	assert.True(t, parser.skipPackageByPrefix("github.com/swaggo/swag"))
-	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/cmd"))
-	assert.False(t, parser.skipPackageByPrefix("github.com/swaggo/swag/gen"))
+	assert.True(t, parser.skipPackageByPrefix("github.com/yalochat/swag"))
+	assert.False(t, parser.skipPackageByPrefix("github.com/yalochat/swag/cmd"))
+	assert.False(t, parser.skipPackageByPrefix("github.com/yalochat/swag/gen"))
 }
 
 func TestParser_ParseRouterApiInFuncBody(t *testing.T) {
@@ -4378,6 +4380,7 @@ func TestParser_EmbeddedStructAsOtherAliasGoListNested(t *testing.T) {
 	searchDir := "testdata/alias_nested"
 	expected, err := os.ReadFile(filepath.Join(searchDir, "expected.json"))
 	assert.NoError(t, err)
+	expected = bytes.TrimSpace(expected)
 
 	err = p.ParseAPI(searchDir, "cmd/main/main.go", 0)
 	assert.NoError(t, err)

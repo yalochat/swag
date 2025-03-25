@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/swaggo/swag/v2/testdata/alias_type/data"
+	"github.com/yalochat/swag/v2/testdata/alias_type/data"
 )
 
 /*// @Summary Get time as string
@@ -46,8 +46,8 @@ func GetTimeAsTimeContainer(w http.ResponseWriter, r *http.Request) {
 	var foo = data.TimeContainer{
 		Name:      "test",
 		Timestamp: now,
-		//CreatedAt: &now,
+		// CreatedAt: &now,
 	}
 	log.Println(foo)
-	//write your code
+	// write your code
 }

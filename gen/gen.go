@@ -19,7 +19,7 @@ import (
 	v2 "github.com/go-openapi/spec"
 	v3 "github.com/sv-tools/openapi/spec"
 
-	"github.com/swaggo/swag/v2"
+	"github.com/yalochat/swag/v2"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"sigs.k8s.io/yaml"

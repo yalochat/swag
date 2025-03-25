@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	_ "github.com/swaggo/swag/v2/testdata/simple/web"
+	_ "github.com/yalochat/swag/v2/testdata/simple/web"
 )
 
 // @Summary      Add a new pet to the store
@@ -18,7 +18,7 @@ import (
 // @Failure      404      {object}  web.APIError  "Can not find ID"
 // @Router       /testapi/get-string-by-int/{some_id} [get]
 func GetStringByInt(w http.ResponseWriter, r *http.Request) {
-	//write your code
+	// write your code
 }
 
 // @Description  get struct array by ID
@@ -41,7 +41,7 @@ func GetStringByInt(w http.ResponseWriter, r *http.Request) {
 // @Security     OAuth2Password[admin]
 // @Router       /testapi/get-struct-array-by-string/{some_id} [get]
 func GetStructArrayByString(w http.ResponseWriter, r *http.Request) {
-	//write your code
+	// write your code
 }
 
 // @Summary      Upload file
@@ -56,7 +56,7 @@ func GetStructArrayByString(w http.ResponseWriter, r *http.Request) {
 // @Failure      404   {object}  web.APIError  "Can not find ID"
 // @Router       /file/upload [post]
 func Upload(w http.ResponseWriter, r *http.Request) {
-	//write your code
+	// write your code
 }
 
 // @Summary  use Anonymous field

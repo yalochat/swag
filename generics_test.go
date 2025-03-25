@@ -1,6 +1,7 @@
 package swag
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"go/ast"
@@ -122,6 +123,7 @@ func TestParseGenericsPackageAlias(t *testing.T) {
 	searchDir := "testdata/generics_package_alias/internal"
 	expected, err := os.ReadFile(filepath.Join(searchDir, "expected.json"))
 	assert.NoError(t, err)
+	expected = bytes.TrimSpace(expected)
 
 	p := New(SetParseDependency(1))
 	err = p.ParseAPI(searchDir, mainAPIFile, defaultParseDepth)

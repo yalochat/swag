@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/swaggo/swag/v2/testdata/generics_arrays/types"
-	"github.com/swaggo/swag/v2/testdata/generics_arrays/web"
+	"github.com/yalochat/swag/v2/testdata/generics_arrays/types"
+	"github.com/yalochat/swag/v2/testdata/generics_arrays/web"
 )
 
 // @Summary List Posts
@@ -28,7 +28,7 @@ func GetPosts(w http.ResponseWriter, r *http.Request) {
 // @Success 222 {object} web.GenericListResponseMulti[types.Post, types.Post]
 // @Router /posts-multi [get]
 func GetPostMulti(w http.ResponseWriter, r *http.Request) {
-	//write your code
+	// write your code
 	_ = web.GenericListResponseMulti[types.Post, types.Post]{}
 }
 
@@ -41,6 +41,6 @@ func GetPostMulti(w http.ResponseWriter, r *http.Request) {
 // @Success 222 {object} web.GenericListResponseMulti[types.Post, []types.Post]
 // @Router /posts-multis [get]
 func GetPostArray(w http.ResponseWriter, r *http.Request) {
-	//write your code
+	// write your code
 	_ = web.GenericListResponseMulti[types.Post, []types.Post]{}
 }

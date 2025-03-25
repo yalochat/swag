@@ -2,11 +2,11 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/swaggo/swag/v2/example/object-map-example/controller"
-	_ "github.com/swaggo/swag/v2/example/object-map-example/docs"
+	"github.com/yalochat/swag/v2/example/object-map-example/controller"
+	_ "github.com/yalochat/swag/v2/example/object-map-example/docs"
 
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
+	swaggerFiles "github.com/yalochat/files"
+	ginSwagger "github.com/yalochat/gin-swagger"
 )
 
 //	@title			Swagger Map Example API
