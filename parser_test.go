@@ -89,7 +89,7 @@ func TestOverrides_getTypeSchema(t *testing.T) {
 	t.Run("Override sql.NullString by string", func(t *testing.T) {
 		t.Parallel()
 
-		s, err := p.getTypeSchema("sql.NullString", nil, false)
+		s, err := p.getTypeSchema("sql.NullString", nil, false, false)
 		if assert.NoError(t, err) {
 			assert.Truef(t, s.Type.Contains("string"), "type sql.NullString should be overridden by string")
 		}
@@ -98,7 +98,7 @@ func TestOverrides_getTypeSchema(t *testing.T) {
 	t.Run("Missing Override for sql.NullInt64", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := p.getTypeSchema("sql.NullInt64", nil, false)
+		_, err := p.getTypeSchema("sql.NullInt64", nil, false, false)
 		if assert.Error(t, err) {
 			assert.Equal(t, "cannot find type definition: sql.NullInt64", err.Error())
 		}
@@ -126,7 +126,7 @@ func TestParser_ParseDefinition(t *testing.T) {
 	expected := &Schema{}
 	p.parsedSchemas[definition] = expected
 
-	schema, err := p.ParseDefinition(definition)
+	schema, err := p.ParseDefinition(definition, false)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, schema)
 
@@ -145,7 +145,7 @@ func TestParser_ParseDefinition(t *testing.T) {
 			Type: &ast.FuncType{},
 		},
 	}
-	_, err = p.ParseDefinition(definition)
+	_, err = p.ParseDefinition(definition, false)
 	assert.Error(t, err)
 
 	// Parsing *ast.FuncType with parent spec
@@ -166,7 +166,7 @@ func TestParser_ParseDefinition(t *testing.T) {
 			Name: ast.NewIdent("TestFuncDecl"),
 		},
 	}
-	_, err = p.ParseDefinition(definition)
+	_, err = p.ParseDefinition(definition, false)
 	assert.Error(t, err)
 	assert.Equal(t, "model.TestFuncDecl.Test", definition.TypeName())
 }
@@ -576,7 +576,8 @@ func TestParser_ParseGeneralAPITagDocs(t *testing.T) {
 		"@tag.name test",
 		"@tag.description A test Tag",
 		"@tag.docs.url https://example.com",
-		"@tag.docs.description Best example documentation"})
+		"@tag.docs.description Best example documentation",
+		"@tag.x-displayName Test group"})
 	assert.NoError(t, err)
 
 	b, _ := json.MarshalIndent(parser.GetSwagger().Tags, "", "    ")
@@ -587,7 +588,8 @@ func TestParser_ParseGeneralAPITagDocs(t *testing.T) {
         "externalDocs": {
             "description": "Best example documentation",
             "url": "https://example.com"
-        }
+        },
+        "x-displayName": "Test group"
     }
 ]`
 	assert.Equal(t, expected, string(b))
@@ -1330,7 +1332,8 @@ func TestParseSimpleApi_ForSnakecase(t *testing.T) {
                     "type": "integer"
                 },
                 "err": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int32"
                 },
                 "status": {
                     "type": "boolean"
@@ -1786,7 +1789,8 @@ func TestParseSimpleApi_ForLowerCamelcase(t *testing.T) {
                     "type": "integer"
                 },
                 "err": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int32"
                 },
                 "status": {
                     "type": "boolean"
@@ -1945,7 +1949,8 @@ func TestParseStructComment(t *testing.T) {
                 },
                 "errorNo": {
                     "description": "Error ` + "`" + `number` + "`" + ` tick comment",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         }
@@ -2169,7 +2174,7 @@ func TestParseImportAliases(t *testing.T) {
 
 	b, _ := json.MarshalIndent(p.swagger, "", "    ")
 	// windows will fail: \r\n \n
-	assert.Equal(t, string(expected), string(b))
+	assert.Equal(t, strings.TrimSpace(string(expected)), strings.TrimSpace(string(b)))
 }
 
 func TestParseTypeOverrides(t *testing.T) {
@@ -2260,8 +2265,7 @@ func TestParseConflictSchemaName(t *testing.T) {
 	b, _ := json.MarshalIndent(p.swagger, "", "    ")
 	expected, err := os.ReadFile(filepath.Join(searchDir, "expected.json"))
 	assert.NoError(t, err)
-	expected = bytes.TrimSpace(expected)
-	assert.Equal(t, string(expected), string(b))
+	assert.Equal(t, strings.TrimSpace(string(expected)), strings.TrimSpace(string(b)))
 }
 
 func TestParseExternalModels(t *testing.T) {
@@ -4387,5 +4391,36 @@ func TestParser_EmbeddedStructAsOtherAliasGoListNested(t *testing.T) {
 
 	b, err := json.MarshalIndent(p.swagger, "", "    ")
 	assert.NoError(t, err)
-	assert.Equal(t, string(expected), string(b))
+	assert.Equal(t, strings.TrimSpace(string(expected)), strings.TrimSpace(string(b)))
+}
+
+func TestParser_genVarDefinedFuncDoc(t *testing.T) {
+	t.Parallel()
+
+	src := `
+package main
+func f() {}
+// @Summary	generate var-defined functions' doc
+// @Router /test [get]
+var Func = f
+// @Summary generate indirectly pointing
+// @Router /test2 [get]
+var Func2 = Func
+`
+	p := New()
+	err := p.packages.ParseFile("api", "api/api.go", src, ParseAll)
+	assert.NoError(t, err)
+	_, _ = p.packages.ParseTypes()
+	err = p.packages.RangeFiles(p.ParseRouterAPIInfo)
+	assert.NoError(t, err)
+
+	val, ok := p.swagger.Paths.Paths["/test"]
+	assert.True(t, ok)
+	assert.NotNil(t, val.Get)
+	assert.Equal(t, val.Get.OperationProps.Summary, "generate var-defined functions' doc")
+
+	val2, ok := p.swagger.Paths.Paths["/test2"]
+	assert.True(t, ok)
+	assert.NotNil(t, val2.Get)
+	assert.Equal(t, val2.Get.OperationProps.Summary, "generate indirectly pointing")
 }
