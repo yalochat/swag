@@ -2635,88 +2635,94 @@ func normalizeJSON(input string) string {
 }
 
 func TestParseParamsSetExampleByInstance(t *testing.T) {
-	t.Parallel()
+  t.Parallel()
 
-	packagePath := "testdata/param_structs"
-	filePath := packagePath + "/instances.go"
-	src, err := os.ReadFile(filePath)
-	assert.NoError(t, err)
+  packagePath := "testdata/param_structs"
+  filePath := packagePath + "/instances.go"
+  src, err := os.ReadFile(filePath)
+  assert.NoError(t, err)
 
-	fileSet := token.NewFileSet()
-	fileAST, err := goparser.ParseFile(fileSet, "", src, goparser.ParseComments)
-	assert.NoError(t, err)
+  fileSet := token.NewFileSet()
+  fileAST, err := goparser.ParseFile(fileSet, "", src, goparser.ParseComments)
+  assert.NoError(t, err)
 
-	parser := New()
-	err = parser.parseFile("github.com/yalochat/swag/testdata/param_structs", "testdata/param_structs/structs.go", nil, ParseModels)
-	assert.NoError(t, err)
-	_, err = parser.packages.ParseTypes()
-	assert.NoError(t, err)
+  parser := New()
+  err = parser.parseFile("github.com/yalochat/swag/testdata/param_structs", "testdata/param_structs/structs.go", nil, ParseModels)
+  assert.NoError(t, err)
+  _, err = parser.packages.ParseTypes()
+  assert.NoError(t, err)
 
-	t.Run("Parse params with simple example by instance", func(t *testing.T) {
-		comment := `@Param some_id body FormModel true "Some ID" inCodeExample(FormModelExample)`
-		operation := NewOperation(parser)
-		err = operation.ParseComment(comment, fileAST)
+  tests := []struct {
+    name     string
+    comment  string
+    expected string
+  }{
+    {
+      name:    "Parse params with simple example by instance",
+      comment: `@Param some_id body FormModel true "Some ID" inCodeExample(FormModelExample)`,
+      expected: `[
+        {
+          "example": {
+            "B": true,
+            "Foo": "foo"
+          },
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "body",
+          "required": true,
+          "schema": {
+            "$ref": "#/definitions/structs.FormModel"
+          }
+        }
+      ]`,
+    },
+    {
+      name:    "Parse params with complex example by instance",
+      comment: `@Param some_id body CompositeStruct true "Some ID" inCodeExample(CompositeStructExample)`,
+      expected: `[
+        {
+          "example": {
+            "ArrayExample": [
+              {
+                "B": true,
+                "Foo": "foo"
+              }
+            ],
+            "FormModelExample": {
+              "B": true,
+              "Foo": "foo"
+            },
+            "MapExample": {
+              "key": {
+                "AnotherHeader": "1",
+                "Token": "token"
+              }
+            },
+            "PathModelExample": {
+              "Identifier": "1",
+              "Name": "name"
+            }
+          },
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "body",
+          "required": true,
+          "schema": {
+            "$ref": "#/definitions/structs.CompositeStruct"
+          }
+        }
+      ]`,
+    },
+  }
 
-		assert.NoError(t, err)
-		b, _ := json.MarshalIndent(operation.Parameters, "", "    ")
-		expected := `[
-			{
-				"example": {
-					"B": true,
-					"Foo": "foo"
-				},
-				"description": "Some ID",
-				"name": "some_id",
-				"in": "body",
-				"required": true,
-				"schema": {
-					"$ref": "#/definitions/structs.FormModel"
-				}
-			}
-		]`
-		assert.Equal(t, normalizeJSON(expected),  normalizeJSON(string(b)))
-	})
+  for _, tt := range tests {
+    t.Run(tt.name, func(t *testing.T) {
+      operation := NewOperation(parser)
+      err := operation.ParseComment(tt.comment, fileAST)
+      assert.NoError(t, err)
 
-	t.Run("Parse params with complex example by instance", func(t *testing.T) {
-		comment := `@Param some_id body CompositeStruct true "Some ID" inCodeExample(CompositeStructExample)`
-		operation := NewOperation(parser)
-		err = operation.ParseComment(comment, fileAST)
-
-		assert.NoError(t, err)
-		b, _ := json.MarshalIndent(operation.Parameters, "", "    ")
-		expected := `[
-			{
-				"example": {
-					"ArrayExample": [
-						{
-							"B": true,
-							"Foo": "foo"
-						}
-					],
-					"FormModelExample": {
-						"B": true,
-						"Foo": "foo"
-					},
-					"MapExample": {
-						"key": {
-							"AnotherHeader": "1",
-							"Token": "token"
-						}
-					},
-					"PathModelExample": {
-						"Identifier": "1",
-						"Name": "name"
-					}
-				},
-				"description": "Some ID",
-				"name": "some_id",
-				"in": "body",
-				"required": true,
-				"schema": {
-					"$ref": "#/definitions/structs.CompositeStruct"
-				}
-			}
-		]`
-		assert.Equal(t, normalizeJSON(expected),  normalizeJSON(string(b)))
-	})
+      b, _ := json.MarshalIndent(operation.Parameters, "", "    ")
+      assert.Equal(t, normalizeJSON(tt.expected), normalizeJSON(string(b)))
+    })
+  }
 }
