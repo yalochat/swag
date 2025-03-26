@@ -508,25 +508,25 @@ func (operation *Operation) parseParamAttribute(comment, objectType, schemaType,
 }
 
 func parseExpr(expr ast.Expr, file *ast.File) interface{} {
-	switch v := expr.(type) {
+	switch astExpr := expr.(type) {
 	case *ast.BasicLit:
-		return parseBasicLiteral(v)
+		return parseBasicLiteral(astExpr)
 	case *ast.CompositeLit:
-		return parseCompositeLiteral(v, file) // Nested structs or arrays
+		return parseCompositeLiteral(astExpr, file) // Nested structs or arrays
 	case *ast.UnaryExpr:
-		if v.Op == token.AND {
-			return parseExpr(v.X, file) // Dereference and parse the value
+		if astExpr.Op == token.AND {
+			return parseExpr(astExpr.X, file) // Dereference and parse the value
 		}
 		return nil
 	case *ast.Ident:
 		// Handle boolean literals (true/false)
-		if v.Name == "true" {
+		if astExpr.Name == "true" {
 			return true
-		} else if v.Name == "false" {
+		} else if astExpr.Name == "false" {
 			return false
 		}
 		//Handle variable references
-		return resolveIdentValue(v.Name, file)
+		return resolveIdentValue(astExpr.Name, file)
 	default:
 		return nil // Unsupported type
 	}
@@ -602,10 +602,10 @@ func parseCompositeLiteral(literal *ast.CompositeLit, file *ast.File) interface{
 	// Handle maps
 	if _, ok := literal.Type.(*ast.MapType); ok {
 		obj := make(map[string]interface{})
-		for _, elt := range literal.Elts {
-			if kv, ok := elt.(*ast.KeyValueExpr); ok {
-				key := parseExpr(kv.Key, file)
-				value := parseExpr(kv.Value, file)
+		for _, compositeElement := range literal.Elts {
+			if keyValueExpr, ok := compositeElement.(*ast.KeyValueExpr); ok {
+				key := parseExpr(keyValueExpr.Key, file)
+				value := parseExpr(keyValueExpr.Value, file)
 
 				// Ensure key is a string (convert if needed)
 				keyStr, ok := key.(string)
@@ -620,10 +620,10 @@ func parseCompositeLiteral(literal *ast.CompositeLit, file *ast.File) interface{
 
 	// Handle struct literals: {Key: Value}
 	obj := make(map[string]interface{})
-	for _, elt := range literal.Elts {
-		if kv, ok := elt.(*ast.KeyValueExpr); ok {
-			if key, ok := kv.Key.(*ast.Ident); ok {
-				obj[key.Name] = parseExpr(kv.Value, file)
+	for _, compositeElement := range literal.Elts {
+		if keyValueExpr, ok := compositeElement.(*ast.KeyValueExpr); ok {
+			if key, ok := keyValueExpr.Key.(*ast.Ident); ok {
+				obj[key.Name] = parseExpr(keyValueExpr.Value, file)
 			}
 		}
 	}
