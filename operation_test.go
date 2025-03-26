@@ -2657,6 +2657,34 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
     comment  string
     expected string
   }{
+		{
+			name: 	"Parse params with string example by instance",
+			comment: `@Param some_id query string true "Some ID" inCodeExample(StringExample)`,
+			expected: `[
+        {
+          "example": "AwesomeString",
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "query",
+          "required": true,
+					"type": "string"
+        }
+      ]`,
+		},
+		{
+			name: 	"Parse params with int example by instance",
+			comment: `@Param some_id query int true "Some ID" inCodeExample(IntExample)`,
+			expected: `[
+        {
+          "example": 1,
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "query",
+          "required": true,
+					"type": "integer"
+        }
+      ]`,
+		},
     {
       name:    "Parse params with simple example by instance",
       comment: `@Param some_id body FormModel true "Some ID" inCodeExample(FormModelExample)`,
@@ -2694,12 +2722,12 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
             },
             "MapExample": {
               "key": {
-                "AnotherHeader": "1",
+                "AnotherHeader": 1,
                 "Token": "token"
               }
             },
             "PathModelExample": {
-              "Identifier": "1",
+              "Identifier": 1,
               "Name": "name"
             }
           },

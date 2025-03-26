@@ -572,8 +572,14 @@ func setExampleByInstance(astFile *ast.File, param *spec.Parameter, attr string)
 func parseBasicLiteral(literal *ast.BasicLit) interface{} {
 	switch literal.Kind {
 	case token.INT:
+		if asInt, err := strconv.ParseInt(literal.Value, 10, 64); err == nil {
+			return asInt
+		}
 		return literal.Value
 	case token.FLOAT:
+		if asFloat, err := strconv.ParseFloat(literal.Value, 64); err == nil {
+			return asFloat
+		}
 		return literal.Value
 	case token.STRING:
 		return literal.Value[1 : len(literal.Value)-1] // Remove quotes
