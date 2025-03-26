@@ -18,3 +18,10 @@ type PathModel struct {
 	Identifier int    `uri:"id" binding:"required"`
 	Name       string `validate:"max=10"`
 }
+
+type CompositeStruct struct {
+	FormModelExample *FormModel
+	PathModelExample PathModel
+	MapExample map[string]AuthHeader
+	ArrayExample []FormModel
+}
