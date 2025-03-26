@@ -587,12 +587,8 @@ func parseCompositeLiteral(literal *ast.CompositeLit, file *ast.File) interface{
 	if _, ok := literal.Type.(*ast.ArrayType); ok {
 		var arr []interface{}
 		for _, elem := range literal.Elts {
-			switch v := elem.(type) {
-			case *ast.BasicLit:
-				arr = append(arr, parseBasicLiteral(v))
-			case *ast.CompositeLit:
-				arr = append(arr, parseCompositeLiteral(v, file))
-			}
+			value := parseExpr(elem, file)
+			arr = append(arr, value)
 		}
 		return arr
 	}
