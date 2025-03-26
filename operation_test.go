@@ -2685,8 +2685,22 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
         }
       ]`,
 		},
+		{
+			name: 	"Parse params with float example by instance",
+			comment: `@Param some_id query number true "Some ID" inCodeExample(FloatExample)`,
+			expected: `[
+        {
+          "example": 1.1,
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "query",
+          "required": true,
+					"type": "number"
+        }
+      ]`,
+		},
     {
-      name:    "Parse params with simple example by instance",
+      name:    "Parse params with simple struct example by instance",
       comment: `@Param some_id body FormModel true "Some ID" inCodeExample(FormModelExample)`,
       expected: `[
         {
@@ -2705,7 +2719,7 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
       ]`,
     },
     {
-      name:    "Parse params with complex example by instance",
+      name:    "Parse params with complex struct example by instance",
       comment: `@Param some_id body CompositeStruct true "Some ID" inCodeExample(CompositeStructExample)`,
       expected: `[
         {
