@@ -588,37 +588,34 @@ func parseBasicLiteral(literal *ast.BasicLit) interface{} {
 	}
 }
 
-func parseCompositeLiteral(literal *ast.CompositeLit, file *ast.File) interface{} {
-	// Handle array and struct examples
-	if _, ok := literal.Type.(*ast.ArrayType); ok {
-		var arr []interface{}
-		for _, elem := range literal.Elts {
-			value := parseExpr(elem, file)
-			arr = append(arr, value)
-		}
-		return arr
-	}
+func handleMapCompositeLiteral(literal *ast.CompositeLit, file *ast.File) map[string]interface{} {
+	obj := make(map[string]interface{})
+	for _, compositeElement := range literal.Elts {
+		if keyValueExpr, ok := compositeElement.(*ast.KeyValueExpr); ok {
+			key := parseExpr(keyValueExpr.Key, file)
+			value := parseExpr(keyValueExpr.Value, file)
 
-	// Handle maps
-	if _, ok := literal.Type.(*ast.MapType); ok {
-		obj := make(map[string]interface{})
-		for _, compositeElement := range literal.Elts {
-			if keyValueExpr, ok := compositeElement.(*ast.KeyValueExpr); ok {
-				key := parseExpr(keyValueExpr.Key, file)
-				value := parseExpr(keyValueExpr.Value, file)
-
-				// Ensure key is a string (convert if needed)
-				keyStr, ok := key.(string)
-				if !ok {
-					keyStr = fmt.Sprintf("%v", key) // Convert to string
-				}
-				obj[keyStr] = value
+			// Ensure key is a string (convert if needed)
+			keyStr, ok := key.(string)
+			if !ok {
+				keyStr = fmt.Sprintf("%v", key)
 			}
+			obj[keyStr] = value
 		}
-		return obj
 	}
+	return obj
+}
 
-	// Handle struct literals: {Key: Value}
+func handleArrayCompositeLiteral(literal *ast.CompositeLit, file *ast.File) []interface{} {
+	var arr []interface{}
+	for _, elem := range literal.Elts {
+		value := parseExpr(elem, file)
+		arr = append(arr, value)
+	}
+	return arr
+}
+
+func handleStructCompositeLiteral(literal *ast.CompositeLit, file *ast.File) interface{} {
 	obj := make(map[string]interface{})
 	for _, compositeElement := range literal.Elts {
 		if keyValueExpr, ok := compositeElement.(*ast.KeyValueExpr); ok {
@@ -629,6 +626,17 @@ func parseCompositeLiteral(literal *ast.CompositeLit, file *ast.File) interface{
 	}
 
 	return obj
+}
+
+func parseCompositeLiteral(literal *ast.CompositeLit, file *ast.File) interface{} {
+	switch literal.Type.(type) {
+	case *ast.ArrayType:
+		return handleArrayCompositeLiteral(literal, file)
+	case *ast.MapType:
+		return handleMapCompositeLiteral(literal, file)
+	default:
+		return handleStructCompositeLiteral(literal, file)
+	}
 }
 
 func findAttr(re *regexp.Regexp, commentLine string) (string, error) {
