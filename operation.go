@@ -437,7 +437,7 @@ const (
 	collectionFormatTag = "collectionFormat"
 	patternTag          = "pattern"
 	oneOfTag            = "oneOf"
-	inCodeExampleTag    = "inCodeExample"
+	exampleByInstanceTag    = "exampleByInstance"
 )
 
 var regexAttributes = map[string]*regexp.Regexp{
@@ -463,8 +463,8 @@ var regexAttributes = map[string]*regexp.Regexp{
 	exampleTag: regexp.MustCompile(`(?i)\s+example\(.*\)`),
 	// schemaExample(0)
 	schemaExampleTag: regexp.MustCompile(`(?i)\s+schemaExample\(.*\)`),
-	// inCodeExample(instance)
-	inCodeExampleTag: regexp.MustCompile(`(?i)\s+inCodeExample\(.*\)`),
+	// exampleByInstance(instance)
+	exampleByInstanceTag: regexp.MustCompile(`(?i)\s+exampleByInstance\(.*\)`),
 }
 
 func (operation *Operation) parseParamAttribute(comment, objectType, schemaType, paramType string, param *spec.Parameter, astFile *ast.File) error {
@@ -495,8 +495,8 @@ func (operation *Operation) parseParamAttribute(comment, objectType, schemaType,
 			param.Extensions = setExtensionParam(attr)
 		case collectionFormatTag:
 			err = setCollectionFormatParam(param, attrKey, objectType, attr, comment)
-		case inCodeExampleTag:
-			err = setExampleByInstance(astFile, param, attr)
+		case exampleByInstanceTag:
+			err = setParamExampleByInstance(astFile, param, attr)
 		}
 
 		if err != nil {
@@ -504,6 +504,24 @@ func (operation *Operation) parseParamAttribute(comment, objectType, schemaType,
 		}
 	}
 
+	return nil
+}
+
+func (operation *Operation) parseResponseAttribute(comment string, response *spec.Response, astFile *ast.File) error {
+	for attrKey, re := range regexAttributes {
+		attr, err := findAttr(re, comment)
+		if err != nil {
+			continue
+		}
+		switch attrKey {
+		case exampleByInstanceTag:
+			err = setResponseExampleByInstance(astFile, response, attr)
+		}
+
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -553,19 +571,49 @@ func resolveIdentValue(identName string, file *ast.File) interface{} {
 	return value
 }
 
-func setExampleByInstance(astFile *ast.File, param *spec.Parameter, attr string) error {
-	if astFile == nil || param == nil {
-		return fmt.Errorf("astFile and param cannot be nil")
+func getExampleByInstance(astFile *ast.File, attr string) (interface{}, error) {
+	if astFile == nil {
+		return nil, fmt.Errorf("astFile cannot be nil")
 	}
 
 	// Walk through the AST to find the declaration of `attr`
 	example := resolveIdentValue(attr, astFile)
 
 	if example == nil {
-		return fmt.Errorf("example instance not found or unsupported type")
+		return nil, fmt.Errorf("example instance not found or unsupported type")
+	}
+
+	return example, nil
+}
+
+func setParamExampleByInstance(astFile *ast.File, param *spec.Parameter, attr string) error {
+	if param == nil {
+		return fmt.Errorf("param cannot be nil")
+	}
+
+	example, err := getExampleByInstance(astFile, attr)
+	if err != nil {
+		return err
 	}
 
 	param.Example = example
+	return nil
+}
+
+func setResponseExampleByInstance(astFile *ast.File, response *spec.Response, attr string) error {
+	if response == nil {
+		return fmt.Errorf("response cannot be nil")
+	}
+
+	example, err := getExampleByInstance(astFile, attr)
+	if err != nil {
+		return err
+	}
+
+	if response.Examples == nil {
+		response.Examples = make(map[string]interface{})
+	}
+	response.Examples["application/json"] = example
 	return nil
 }
 
@@ -980,7 +1028,7 @@ func findTypeDef(importPath, typeName string) (*ast.TypeSpec, error) {
 	return nil, fmt.Errorf("type spec not found")
 }
 
-var responsePattern = regexp.MustCompile(`^([\w,]+)\s+([\w{}]+)\s+([\w\-.\\{}=,\[\s\]]+)\s*(".*)?`)
+var responsePattern = regexp.MustCompile(`^([\w,]+)\s+([a-zA-Z0-9\[\]{}.-]+)\s+([^\s]+)\s*(".*")?`)
 
 // ResponseType{data1=Type1,data2=Type2}.
 var combinedPattern = regexp.MustCompile(`^([\w\-./\[\]]+){(.*)}$`)
@@ -1173,6 +1221,7 @@ func (operation *Operation) ParseResponseComment(commentLine string, astFile *as
 			resp.WithDescription(http.StatusText(code))
 		}
 
+		operation.parseResponseAttribute(commentLine, resp, astFile)
 		operation.AddResponse(code, resp)
 	}
 

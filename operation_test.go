@@ -2659,7 +2659,7 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
   }{
 		{
 			name: 	"Parse params with string example by instance",
-			comment: `@Param some_id query string true "Some ID" inCodeExample(StringExample)`,
+			comment: `@Param some_id query string true "Some ID" exampleByInstance(StringExample)`,
 			expected: `[
         {
           "example": "AwesomeString",
@@ -2673,7 +2673,7 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
 		},
 		{
 			name: 	"Parse params with int example by instance",
-			comment: `@Param some_id query int true "Some ID" inCodeExample(IntExample)`,
+			comment: `@Param some_id query int true "Some ID" exampleByInstance(IntExample)`,
 			expected: `[
         {
           "example": 1,
@@ -2687,7 +2687,7 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
 		},
 		{
 			name: 	"Parse params with float example by instance",
-			comment: `@Param some_id query number true "Some ID" inCodeExample(FloatExample)`,
+			comment: `@Param some_id query number true "Some ID" exampleByInstance(FloatExample)`,
 			expected: `[
         {
           "example": 1.1,
@@ -2701,7 +2701,7 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
 		},
     {
       name:    "Parse params with simple struct example by instance",
-      comment: `@Param some_id body FormModel true "Some ID" inCodeExample(FormModelExample)`,
+      comment: `@Param some_id body FormModel true "Some ID" exampleByInstance(FormModelExample)`,
       expected: `[
         {
           "example": {
@@ -2720,7 +2720,7 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
     },
     {
       name:    "Parse params with complex struct example by instance",
-      comment: `@Param some_id body CompositeStruct true "Some ID" inCodeExample(CompositeStructExample)`,
+      comment: `@Param some_id body CompositeStruct true "Some ID" exampleByInstance(CompositeStructExample)`,
       expected: `[
         {
           "example": {

@@ -426,7 +426,7 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 		if objectType == PRIMITIVE {
 			schema := PrimitiveSchemaV3(refType)
 
-			err := o.parseParamAttributeForBody(commentLine, objectType, refType, schema.Spec)
+			err := o.parseParamAttributeForBody(commentLine, objectType, refType, schema.Spec, astFile)
 			if err != nil {
 				return err
 			}
@@ -442,7 +442,7 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 			return err
 		}
 
-		err = o.parseParamAttributeForBody(commentLine, objectType, refType, schema.Spec)
+		err = o.parseParamAttributeForBody(commentLine, objectType, refType, schema.Spec, astFile)
 		if err != nil {
 			return err
 		}
@@ -455,7 +455,7 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 		return fmt.Errorf("%s is not supported paramType", paramType)
 	}
 
-	err := o.parseParamAttribute(commentLine, objectType, refType, &param)
+	err := o.parseParamAttribute(commentLine, objectType, refType, &param, astFile)
 	if err != nil {
 		return err
 	}
@@ -491,7 +491,7 @@ func (o *OperationV3) fillRequestBody(schema *spec.RefOrSpec[spec.Schema], requi
 	}
 }
 
-func (o *OperationV3) parseParamAttribute(comment, objectType, schemaType string, param *spec.Parameter) error {
+func (o *OperationV3) parseParamAttribute(comment, objectType, schemaType string, param *spec.Parameter, astFile *ast.File) error {
 	if param == nil {
 		return fmt.Errorf("cannot parse empty parameter for comment: %s", comment)
 	}
@@ -528,6 +528,8 @@ func (o *OperationV3) parseParamAttribute(comment, objectType, schemaType string
 			param.Schema.Spec.Extensions = setExtensionParam(attr)
 		case collectionFormatTag:
 			err = setCollectionFormatParamV3(param, attrKey, objectType, attr, comment)
+		case exampleByInstanceTag:
+			err = setParamExampleByInstanceV3(astFile, param, attr)
 		}
 
 		if err != nil {
@@ -538,7 +540,7 @@ func (o *OperationV3) parseParamAttribute(comment, objectType, schemaType string
 	return nil
 }
 
-func (o *OperationV3) parseParamAttributeForBody(comment, objectType, schemaType string, param *spec.Schema) error {
+func (o *OperationV3) parseParamAttributeForBody(comment, objectType, schemaType string, paramSchema *spec.Schema, astFile *ast.File) error {
 	schemaType = TransToValidSchemeType(schemaType)
 
 	for attrKey, re := range regexAttributes {
@@ -549,21 +551,27 @@ func (o *OperationV3) parseParamAttributeForBody(comment, objectType, schemaType
 
 		switch attrKey {
 		case enumsTag:
-			err = setEnumParamV3(param, attr, objectType, schemaType)
+			err = setEnumParamV3(paramSchema, attr, objectType, schemaType)
 		case minimumTag, maximumTag:
-			err = setNumberParamV3(param, attrKey, schemaType, attr, comment)
+			err = setNumberParamV3(paramSchema, attrKey, schemaType, attr, comment)
 		case defaultTag:
-			err = setDefaultV3(param, schemaType, attr)
+			err = setDefaultV3(paramSchema, schemaType, attr)
 		case minLengthTag, maxLengthTag:
-			err = setStringParamV3(param, attrKey, schemaType, attr, comment)
+			err = setStringParamV3(paramSchema, attrKey, schemaType, attr, comment)
 		case formatTag:
-			param.Format = attr
+			paramSchema.Format = attr
 		case exampleTag:
-			err = setSchemaExampleV3(param, schemaType, attr)
+			err = setSchemaExampleV3(paramSchema, schemaType, attr)
 		case schemaExampleTag:
-			err = setSchemaExampleV3(param, schemaType, attr)
+			err = setSchemaExampleV3(paramSchema, schemaType, attr)
 		case extensionsTag:
-			param.Extensions = setExtensionParam(attr)
+			paramSchema.Extensions = setExtensionParam(attr)
+		case exampleByInstanceTag:
+			examples, err := getBodyParamExamplesByInstanceV3(astFile, attr)
+			if err != nil {
+				return err
+			}
+			o.addExamplesToRequestBody(examples)
 		}
 
 		if err != nil {
@@ -574,6 +582,37 @@ func (o *OperationV3) parseParamAttributeForBody(comment, objectType, schemaType
 	return nil
 }
 
+func (o *OperationV3) addExamplesToRequestBody(examples map[string]interface{}) {
+	if o.RequestBody == nil {
+		o.RequestBody = spec.NewRequestBodySpec()
+		o.RequestBody.Spec.Spec.Content = make(map[string]*spec.Extendable[spec.MediaType])
+		o.RequestBody.Spec.Spec.Content["application/json"] = spec.NewMediaType()
+	}
+
+	for key, example := range examples {
+		requestBodyExamples := addExampleToExamplesMap(o.RequestBody.Spec.Spec.Content["application/json"].Spec.Examples, key, example)
+		o.RequestBody.Spec.Spec.Content["application/json"].Spec.Examples = requestBodyExamples
+	}
+}
+
+func (o *OperationV3) parseResponseAttributeV3(comment string, response *spec.Response, astFile *ast.File) error {
+	for attrKey, re := range regexAttributes {
+		attr, err := findAttr(re, comment)
+		if err != nil {
+			continue
+		}
+		switch attrKey {
+		case exampleByInstanceTag:
+			err = setResponseExampleByInstanceV3(astFile, response, attr)
+		}
+
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func setCollectionFormatParamV3(param *spec.Parameter, name, schemaType, attr, commentLine string) error {
 	if schemaType == ARRAY {
 		param.Style = TransToValidCollectionFormatV3(attr, param.In)
@@ -581,6 +620,87 @@ func setCollectionFormatParamV3(param *spec.Parameter, name, schemaType, attr, c
 	}
 
 	return fmt.Errorf("%s is attribute to set to an array. comment=%s got=%s", name, commentLine, schemaType)
+}
+
+func splitCommaSeparatedString(input string) []string {
+	// Split the string by commas and filter out empty strings
+	var result []string
+	for _, part := range strings.Split(input, ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+type ExampleMapT = map[string]*spec.RefOrSpec[spec.Extendable[spec.Example]]
+
+func addExampleToExamplesMap(exampleMap ExampleMapT, exampleKey string, exampleValue any) ExampleMapT {
+	if exampleMap == nil {
+		exampleMap = make(ExampleMapT)
+	}
+
+	exampleSpec := spec.NewRefOrSpec[spec.Extendable[spec.Example]](nil, &spec.Extendable[spec.Example]{
+		Spec: &spec.Example{
+			Value: exampleValue,
+		},
+	})
+
+	exampleMap[exampleKey] = exampleSpec
+	return exampleMap
+}
+
+func setResponseExampleByInstanceV3(astFile *ast.File, response *spec.Response, attrs string) error {
+	if response == nil {
+		return fmt.Errorf("response cannot be nil")
+	}
+
+	attrsArr := splitCommaSeparatedString(attrs)
+	for _, attr := range attrsArr {
+		example, err := getExampleByInstance(astFile, attr)
+		if err != nil {
+			return err
+		}
+		respExamples := addExampleToExamplesMap(response.Content["application/json"].Spec.Examples, attr, example)
+		response.Content["application/json"].Spec.Examples = respExamples
+	}
+
+	return nil
+}
+
+func getBodyParamExamplesByInstanceV3(astFile *ast.File, attrs string) (map[string]interface{}, error) {
+	attrsArr := splitCommaSeparatedString(attrs)
+	examples := make(map[string]interface{})
+
+	for _, attr := range attrsArr {
+		example, err := getExampleByInstance(astFile, attr)
+		if err != nil {
+			return nil, err
+		}
+
+		examples[attr] = example
+	}
+
+	return examples, nil
+}
+
+func setParamExampleByInstanceV3(astFile *ast.File, param *spec.Parameter, attrs string) error {
+	if param == nil {
+		return fmt.Errorf("param cannot be nil")
+	}
+
+	attrsArr := splitCommaSeparatedString(attrs)
+
+	for _, attr := range attrsArr {
+		example, err := getExampleByInstance(astFile, attr)
+		if err != nil {
+			return err
+		}
+		
+		param.Examples = addExampleToExamplesMap(param.Examples, attr, example)
+	}
+
+	return nil
 }
 
 func setSchemaExampleV3(param *spec.Schema, schemaType string, value string) error {
@@ -959,6 +1079,7 @@ func (o *OperationV3) ParseResponseComment(commentLine string, astFile *ast.File
 		mimeType := "application/json" // TODO: set correct mimeType
 		setResponseSchema(response.Spec.Spec, mimeType, schema)
 
+		o.parseResponseAttributeV3(commentLine, response.Spec.Spec, astFile)
 		o.AddResponse(codeStr, response)
 	}
 
