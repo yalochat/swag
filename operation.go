@@ -496,7 +496,8 @@ func (operation *Operation) parseParamAttribute(comment, objectType, schemaType,
 		case collectionFormatTag:
 			err = setCollectionFormatParam(param, attrKey, objectType, attr, comment)
 		case exampleByInstanceTag:
-			err = setParamExampleByInstance(astFile, param, attr)
+			typeSpecDef := operation.parser.getTypeSpecDefFromSchemaTypeWithPkgName(schemaType)			
+			err = setParamExampleByInstance(operation.parser, typeSpecDef, astFile, param, attr)
 		}
 
 		if err != nil {
@@ -507,7 +508,7 @@ func (operation *Operation) parseParamAttribute(comment, objectType, schemaType,
 	return nil
 }
 
-func (operation *Operation) parseResponseAttribute(comment string, response *spec.Response, astFile *ast.File) error {
+func (operation *Operation) parseResponseAttribute(comment, schemaType string, response *spec.Response, astFile *ast.File) error {
 	for attrKey, re := range regexAttributes {
 		attr, err := findAttr(re, comment)
 		if err != nil {
@@ -515,7 +516,8 @@ func (operation *Operation) parseResponseAttribute(comment string, response *spe
 		}
 		switch attrKey {
 		case exampleByInstanceTag:
-			err = setResponseExampleByInstance(astFile, response, attr)
+			typeSpecDef := operation.parser.getTypeSpecDefFromSchemaTypeWithPkgName(schemaType)
+			err = setResponseExampleByInstance(operation.parser, typeSpecDef, astFile, response, attr)
 		}
 
 		if err != nil {
@@ -525,15 +527,23 @@ func (operation *Operation) parseResponseAttribute(comment string, response *spe
 	return nil
 }
 
-func parseExpr(expr ast.Expr, file *ast.File) interface{} {
+func (parser *Parser) parseExpr(expr ast.Expr, currSpecDef *TypeSpecDef, file *ast.File, shouldGetNew bool) interface{} {
 	switch astExpr := expr.(type) {
 	case *ast.BasicLit:
 		return parseBasicLiteral(astExpr)
 	case *ast.CompositeLit:
-		return parseCompositeLiteral(astExpr, file) // Nested structs or arrays
+		if (shouldGetNew) {
+			newTypeSpecDef, err := parser.getNewTypeSpecDef(astExpr, currSpecDef, file)
+			if err != nil {
+				fmt.Println("Error in getNewTypeSpecDef: ", err)
+				return nil
+			}
+			return parser.parseCompositeLiteral(astExpr, newTypeSpecDef, file) // Nested structs or arrays
+		}
+		return parser.parseCompositeLiteral(astExpr, currSpecDef, file) // Nested structs or arrays
 	case *ast.UnaryExpr:
 		if astExpr.Op == token.AND {
-			return parseExpr(astExpr.X, file) // Dereference and parse the value
+			return parser.parseExpr(astExpr.X, currSpecDef, file, shouldGetNew) // Dereference and parse the value
 		}
 		return nil
 	case *ast.Ident:
@@ -543,16 +553,58 @@ func parseExpr(expr ast.Expr, file *ast.File) interface{} {
 		} else if astExpr.Name == "false" {
 			return false
 		}
-		//Handle variable references
-		return resolveIdentValue(astExpr.Name, file)
+		// Handle variable references
+		return parser.resolveIdentValue(astExpr.Name, currSpecDef, file, shouldGetNew)
+
+	case *ast.SelectorExpr:
+		// Handle package references
+		pkgName := astExpr.X.(*ast.Ident).Name
+		typeName := astExpr.Sel.Name
+		pkgPath, err := parser.findPackagePath(pkgName, file.Imports)
+		if err != nil {
+			fmt.Println("Error in selector expr: ", err)
+			return nil
+		}
+
+		fmt.Println("[parseExpr - Selector Expr] PKG PATH: ", pkgPath)
+		fmt.Println("[parseExpr - Selector Expr] TYPE NAME: ", typeName)
+
+		if packageDefinition, ok := parser.packages.packages[pkgPath]; ok {
+			fmt.Println("[parseExpr - Selector Expr] PACKAGE FOUND: ", packageDefinition)
+			var value interface{}
+			for _, pkgFile := range packageDefinition.Files {
+				ast.Inspect(pkgFile, func(n ast.Node) bool {
+					decl, ok := n.(*ast.ValueSpec)
+					if !ok {
+						return true
+					}
+
+					for i, name := range decl.Names {
+						if name.Name == typeName && len(decl.Values) > i {
+							samplePkgType := TypeSpecDef{ // NEED TO REPLACE THIS - MAYBE WE ONLY NEED THE PACKAGE PATH?
+								PkgPath: pkgPath,
+								File: 	pkgFile,
+							}
+							value = parser.parseExpr(decl.Values[i], &samplePkgType, pkgFile, true)
+							return false // Stop walking
+						}
+					}
+					return true
+				})
+			}
+			return value
+		}
+
+		return nil
 	default:
+		fmt.Println("[parseExpr] Unsupported type: ", fmt.Sprintf("%T", astExpr))
 		return nil // Unsupported type
 	}
 }
 
-func resolveIdentValue(identName string, file *ast.File) interface{} {
+func (parser *Parser) resolveIdentValue(identName string, currTypeSpecDef *TypeSpecDef, file *ast.File, shoulGetNew bool) interface{} {
 	var value interface{}
-
+	fmt.Println("[resolveIdentValue] IDENT NAME: ", identName)
 	ast.Inspect(file, func(n ast.Node) bool {
 		decl, ok := n.(*ast.ValueSpec)
 		if !ok {
@@ -561,7 +613,7 @@ func resolveIdentValue(identName string, file *ast.File) interface{} {
 
 		for i, name := range decl.Names {
 			if name.Name == identName && len(decl.Values) > i {
-				value = parseExpr(decl.Values[i], file)
+				value = parser.parseExpr(decl.Values[i], currTypeSpecDef, file, shoulGetNew)
 				return false // Stop walking
 			}
 		}
@@ -571,13 +623,13 @@ func resolveIdentValue(identName string, file *ast.File) interface{} {
 	return value
 }
 
-func getExampleByInstance(astFile *ast.File, attr string) (interface{}, error) {
-	if astFile == nil {
+func (parser *Parser) getExampleByInstance(currASTFile *ast.File, currTypeSpecDef *TypeSpecDef, attr string) (interface{}, error) {
+	if currASTFile == nil {
 		return nil, fmt.Errorf("astFile cannot be nil")
 	}
 
 	// Walk through the AST to find the declaration of `attr`
-	example := resolveIdentValue(attr, astFile)
+	example := parser.resolveIdentValue(attr, currTypeSpecDef, currASTFile, false)
 
 	if example == nil {
 		return nil, fmt.Errorf("example instance not found or unsupported type")
@@ -586,12 +638,12 @@ func getExampleByInstance(astFile *ast.File, attr string) (interface{}, error) {
 	return example, nil
 }
 
-func setParamExampleByInstance(astFile *ast.File, param *spec.Parameter, attr string) error {
+func setParamExampleByInstance(parser *Parser, currSpecDef *TypeSpecDef, astFile *ast.File, param *spec.Parameter, attr string) error {
 	if param == nil {
 		return fmt.Errorf("param cannot be nil")
 	}
 
-	example, err := getExampleByInstance(astFile, attr)
+	example, err := parser.getExampleByInstance(astFile, currSpecDef, attr)
 	if err != nil {
 		return err
 	}
@@ -600,12 +652,12 @@ func setParamExampleByInstance(astFile *ast.File, param *spec.Parameter, attr st
 	return nil
 }
 
-func setResponseExampleByInstance(astFile *ast.File, response *spec.Response, attr string) error {
+func setResponseExampleByInstance(parser *Parser, currSpecDef *TypeSpecDef, astFile *ast.File, response *spec.Response, attr string) error {
 	if response == nil {
 		return fmt.Errorf("response cannot be nil")
 	}
 
-	example, err := getExampleByInstance(astFile, attr)
+	example, err := parser.getExampleByInstance(astFile, currSpecDef, attr)
 	if err != nil {
 		return err
 	}
@@ -636,12 +688,12 @@ func parseBasicLiteral(literal *ast.BasicLit) interface{} {
 	}
 }
 
-func handleMapCompositeLiteral(literal *ast.CompositeLit, file *ast.File) map[string]interface{} {
+func (parser *Parser) handleMapCompositeLiteral(literal *ast.CompositeLit, currSpecDef *TypeSpecDef, file *ast.File) map[string]interface{} {
 	obj := make(map[string]interface{})
 	for _, compositeElement := range literal.Elts {
 		if keyValueExpr, ok := compositeElement.(*ast.KeyValueExpr); ok {
-			key := parseExpr(keyValueExpr.Key, file)
-			value := parseExpr(keyValueExpr.Value, file)
+			key := parser.parseExpr(keyValueExpr.Key, currSpecDef, file, true)
+			value := parser.parseExpr(keyValueExpr.Value, currSpecDef, file, true)
 
 			// Ensure key is a string (convert if needed)
 			keyStr, ok := key.(string)
@@ -654,21 +706,148 @@ func handleMapCompositeLiteral(literal *ast.CompositeLit, file *ast.File) map[st
 	return obj
 }
 
-func handleArrayCompositeLiteral(literal *ast.CompositeLit, file *ast.File) []interface{} {
+func (parser *Parser) handleArrayCompositeLiteral(literal *ast.CompositeLit, currSpecDef *TypeSpecDef, file *ast.File) []interface{} {
 	var arr []interface{}
 	for _, elem := range literal.Elts {
-		value := parseExpr(elem, file)
+		value := parser.parseExpr(elem, currSpecDef, file, true)
 		arr = append(arr, value)
 	}
 	return arr
 }
 
-func handleStructCompositeLiteral(literal *ast.CompositeLit, file *ast.File) interface{} {
+func (parser *Parser) getFieldJSONTag(typeSpecDef *TypeSpecDef, fieldName string) string {
+	if typeSpecDef == nil || typeSpecDef.TypeSpec == nil {
+		return fieldName
+	}
+
+	fmt.Println("[GET FIELD JSON TAG] PKG PATH: ", typeSpecDef.PkgPath);
+	fmt.Println("[GET FIELD JSON TAG] TYPE NAME: ", typeSpecDef.TypeSpec.Name.Name);
+
+	if structType, ok := typeSpecDef.TypeSpec.Type.(*ast.StructType); ok {
+		for _, field := range structType.Fields.List {
+			for _, name := range field.Names {
+				if name.Name == fieldName {
+					fmt.Println("[GET FIELD JSON TAG] FIELD FOUND")
+					tag := getJSONTag(field)
+					if tag != "" {
+						fmt.Println("[GET FIELD JSON TAG] TAG: ", tag);
+						return tag
+					}
+				}
+			}
+		}
+	}
+
+	fmt.Println("[GET FIELD JSON TAG] TAG: ", fieldName);
+	return fieldName
+}
+
+func (parser *Parser) getArrayTypeInfo(arrType *ast.ArrayType, imports []*ast.ImportSpec) (pkg string, typeName string) {
+	if arrType == nil {
+		return "", ""
+	}
+
+	return parser.getTypeInfo(arrType.Elt, imports)
+}
+
+func (parser *Parser) getMapValueTypeInfo(mapType *ast.MapType, imports []*ast.ImportSpec) (valuePkg, valueType string) {
+	if mapType == nil {
+		return "", ""
+	}
+
+	valuePkg, valueType = parser.getTypeInfo(mapType.Value, imports)
+	return valuePkg, valueType
+}
+
+// Helper function to extract package and type from an arbitrary expression
+func (parser *Parser) getTypeInfo(expr ast.Expr, imports []*ast.ImportSpec) (pkg string, typeName string) {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		// Local type (no package)
+		return "", t.Name
+
+	case *ast.SelectorExpr:
+		// Selector expression: `pkg.Type`
+		if ident, ok := t.X.(*ast.Ident); ok {
+			pkgPath, err := parser.findPackagePath(ident.Name, imports) // Find full package path
+			if err != nil {
+				fmt.Println("Error in getTypeInfo: ", err)
+			}
+			return pkgPath, t.Sel.Name
+		}
+
+	case *ast.StarExpr:
+		// Pointer type: *SomeType
+		return parser.getTypeInfo(t.X, imports)
+
+	case *ast.ArrayType:
+		// Nested array type (e.g., [][]MyType)
+		return parser.getTypeInfo(t.Elt, imports)
+
+	case *ast.MapType:
+		// Map key/value types
+		return parser.getTypeInfo(t.Value, imports)
+
+	case *ast.StructType:
+		// Anonymous struct
+		return "", "struct"
+
+	case *ast.InterfaceType:
+		// Anonymous interface
+		return "", "interface"
+	}
+
+	return "", ""
+}
+
+func (parser *Parser) getNewTypeSpecDef(compositeLit *ast.CompositeLit, currTypeSpecDef *TypeSpecDef, astFile *ast.File) (*TypeSpecDef, error) {
+	switch compositeType := compositeLit.Type.(type) {
+	case *ast.Ident:
+		typeSpecDef, err := parser.getTypeSpecDefFromSchemaNameAndPkgPath(compositeType.Name, currTypeSpecDef.PkgPath)
+		if err != nil {
+			return nil, fmt.Errorf("error getting new type spec def from *ast.Ident: %s", err)
+		}
+		return typeSpecDef, nil
+	case *ast.SelectorExpr:
+		compositePkg := compositeType.X.(*ast.Ident).Name
+		pkgPath, err := parser.findPackagePath(compositePkg, astFile.Imports)
+		if err != nil {
+			return nil, fmt.Errorf("error getting package path from *ast.SelectorExpr: %s", err)
+		}
+		typeSpecDef, err := parser.getTypeSpecDefFromSchemaNameAndPkgPath(compositeType.Sel.Name, pkgPath)
+		if err != nil {
+			return nil, fmt.Errorf("error getting new type spec def from *ast.SelectorExpr: %s", err)
+		}
+		return typeSpecDef, nil
+	case *ast.ArrayType:
+		pkgPath, typeName := parser.getArrayTypeInfo(compositeType, astFile.Imports)
+		typeSpecDef, err := parser.getTypeSpecDefFromSchemaNameAndPkgPath(typeName, pkgPath)
+		if err != nil {
+			return nil, fmt.Errorf("error getting new type spec def from *ast.ArrayType: %s", err)
+		}
+		return typeSpecDef, nil
+	case *ast.MapType:
+		pkgPath, typeName := parser.getMapValueTypeInfo(compositeType, astFile.Imports)
+		typeSpecDef, err := parser.getTypeSpecDefFromSchemaNameAndPkgPath(typeName, pkgPath)
+		if err != nil {
+			return nil, fmt.Errorf("error getting new type spec def from *ast.MapType: %s", err)
+		}
+		return typeSpecDef, nil
+	case nil:
+		return currTypeSpecDef, nil
+	default:
+		fmt.Printf("unsupported composite type: %T\n", compositeType)
+		return nil, nil
+	}
+}
+
+func (parser *Parser) handleStructCompositeLiteral(literal *ast.CompositeLit, typeSpecDef *TypeSpecDef, file *ast.File) interface{} {	
 	obj := make(map[string]interface{})
 	for _, compositeElement := range literal.Elts {
 		if keyValueExpr, ok := compositeElement.(*ast.KeyValueExpr); ok {
 			if key, ok := keyValueExpr.Key.(*ast.Ident); ok {
-				obj[key.Name] = parseExpr(keyValueExpr.Value, file)
+				tag := parser.getFieldJSONTag(typeSpecDef, key.Name)
+				obj[tag] = parser.parseExpr(keyValueExpr.Value, typeSpecDef, file, true)
 			}
 		}
 	}
@@ -676,14 +855,14 @@ func handleStructCompositeLiteral(literal *ast.CompositeLit, file *ast.File) int
 	return obj
 }
 
-func parseCompositeLiteral(literal *ast.CompositeLit, file *ast.File) interface{} {
+func (parser *Parser) parseCompositeLiteral(literal *ast.CompositeLit, typeSpecDef *TypeSpecDef, file *ast.File) interface{} {
 	switch literal.Type.(type) {
 	case *ast.ArrayType:
-		return handleArrayCompositeLiteral(literal, file)
+		return parser.handleArrayCompositeLiteral(literal, typeSpecDef, file)
 	case *ast.MapType:
-		return handleMapCompositeLiteral(literal, file)
+		return parser.handleMapCompositeLiteral(literal, typeSpecDef, file)
 	default:
-		return handleStructCompositeLiteral(literal, file)
+		return parser.handleStructCompositeLiteral(literal, typeSpecDef, file)
 	}
 }
 
@@ -1221,7 +1400,7 @@ func (operation *Operation) ParseResponseComment(commentLine string, astFile *as
 			resp.WithDescription(http.StatusText(code))
 		}
 
-		operation.parseResponseAttribute(commentLine, resp, astFile)
+		operation.parseResponseAttribute(commentLine, strings.TrimSpace(matches[3]), resp, astFile)
 		operation.AddResponse(code, resp)
 	}
 
