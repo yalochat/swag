@@ -715,31 +715,36 @@ func (parser *Parser) handleArrayCompositeLiteral(literal *ast.CompositeLit, cur
 	return arr
 }
 
-func (parser *Parser) getFieldJSONTag(typeSpecDef *TypeSpecDef, fieldName string) string {
+func (parser *Parser) getFieldJSONTag(typeSpecDef *TypeSpecDef, fieldName string) (string, bool) {
 	if typeSpecDef == nil || typeSpecDef.TypeSpec == nil {
-		return fieldName
+		return fieldName, false
 	}
 
 	fmt.Println("[GET FIELD JSON TAG] PKG PATH: ", typeSpecDef.PkgPath);
 	fmt.Println("[GET FIELD JSON TAG] TYPE NAME: ", typeSpecDef.TypeSpec.Name.Name);
+	wasFieldFound := false
 
 	if structType, ok := typeSpecDef.TypeSpec.Type.(*ast.StructType); ok {
 		for _, field := range structType.Fields.List {
 			for _, name := range field.Names {
 				if name.Name == fieldName {
 					fmt.Println("[GET FIELD JSON TAG] FIELD FOUND")
+					wasFieldFound = true
 					tag := getJSONTag(field)
 					if tag != "" {
 						fmt.Println("[GET FIELD JSON TAG] TAG: ", tag);
-						return tag
+						return tag, false
 					}
 				}
 			}
 		}
 	}
-
+	if !wasFieldFound {
+		fmt.Printf("%s IS A EMBEDDED STRUCT!!\n", fieldName)
+		return fieldName, true
+	}
 	fmt.Println("[GET FIELD JSON TAG] TAG: ", fieldName);
-	return fieldName
+	return fieldName, false
 }
 
 func (parser *Parser) getArrayTypeInfo(arrType *ast.ArrayType, imports []*ast.ImportSpec) (pkg string, typeName string) {
@@ -843,12 +848,30 @@ func (parser *Parser) getNewTypeSpecDef(compositeLit *ast.CompositeLit, currType
 
 func (parser *Parser) handleStructCompositeLiteral(literal *ast.CompositeLit, typeSpecDef *TypeSpecDef, file *ast.File) interface{} {	
 	obj := make(map[string]interface{})
+	embeddedKeys := []string{} 
 	for _, compositeElement := range literal.Elts {
 		if keyValueExpr, ok := compositeElement.(*ast.KeyValueExpr); ok {
 			if key, ok := keyValueExpr.Key.(*ast.Ident); ok {
-				tag := parser.getFieldJSONTag(typeSpecDef, key.Name)
+				tag, isEmbedded := parser.getFieldJSONTag(typeSpecDef, key.Name)
+				if isEmbedded {
+					embeddedKeys = append(embeddedKeys, tag)
+				}
 				obj[tag] = parser.parseExpr(keyValueExpr.Value, typeSpecDef, file, true)
 			}
+		}
+	}
+
+	// If there are embedded structs, we need to flatten the struct
+	if len(embeddedKeys) > 0 {
+		for _, key := range embeddedKeys {
+			embeddedObj, ok := obj[key].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			for k, v := range embeddedObj {
+				obj[k] = v
+			}
+			delete(obj, key)
 		}
 	}
 
