@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -713,6 +714,18 @@ func (parser *Parser) handleArrayCompositeLiteral(literal *ast.CompositeLit, cur
 		arr = append(arr, value)
 	}
 	return arr
+}
+
+
+func getJSONTag(field *ast.Field) string {
+	if field.Tag != nil {
+		tagValue := strings.Trim(field.Tag.Value, "`") // Remove backticks
+		jsonTag := reflect.StructTag(tagValue).Get("json")
+		if jsonTag != "" {
+			return strings.Split(jsonTag, ",")[0] // Ignore omitempty, etc.
+		}
+	}
+	return "" // Return empty string if no JSON tag exists
 }
 
 func (parser *Parser) getFieldJSONTag(typeSpecDef *TypeSpecDef, fieldName string) (string, bool) {
