@@ -529,7 +529,8 @@ func (o *OperationV3) parseParamAttribute(comment, objectType, schemaType string
 		case collectionFormatTag:
 			err = setCollectionFormatParamV3(param, attrKey, objectType, attr, comment)
 		case exampleByInstanceTag:
-			err = setParamExampleByInstanceV3(astFile, param, attr)
+			typeSpecDef := o.parser.getTypeSpecDefFromSchemaTypeWithPkgNameV3(schemaType)
+			err = setParamExampleByInstanceV3(o.parser, typeSpecDef, astFile, param, attr)
 		}
 
 		if err != nil {
@@ -567,7 +568,8 @@ func (o *OperationV3) parseParamAttributeForBody(comment, objectType, schemaType
 		case extensionsTag:
 			paramSchema.Extensions = setExtensionParam(attr)
 		case exampleByInstanceTag:
-			examples, err := getBodyParamExamplesByInstanceV3(astFile, attr)
+			typeSpecDef := o.parser.getTypeSpecDefFromSchemaTypeWithPkgNameV3(schemaType)
+			examples, err := getBodyParamExamplesByInstanceV3(o.parser, typeSpecDef, astFile, attr)
 			if err != nil {
 				return err
 			}
@@ -595,7 +597,7 @@ func (o *OperationV3) addExamplesToRequestBody(examples map[string]interface{}) 
 	}
 }
 
-func (o *OperationV3) parseResponseAttributeV3(comment string, response *spec.Response, astFile *ast.File) error {
+func (o *OperationV3) parseResponseAttributeV3(comment, schemaType string, response *spec.Response, astFile *ast.File) error {
 	for attrKey, re := range regexAttributes {
 		attr, err := findAttr(re, comment)
 		if err != nil {
@@ -603,7 +605,8 @@ func (o *OperationV3) parseResponseAttributeV3(comment string, response *spec.Re
 		}
 		switch attrKey {
 		case exampleByInstanceTag:
-			err = setResponseExampleByInstanceV3(astFile, response, attr)
+			typeSpecDef := o.parser.getTypeSpecDefFromSchemaTypeWithPkgNameV3(schemaType)
+			err = setResponseExampleByInstanceV3(o.parser, typeSpecDef, astFile, response, attr)
 		}
 
 		if err != nil {
@@ -650,14 +653,14 @@ func addExampleToExamplesMap(exampleMap ExampleMapT, exampleKey string, exampleV
 	return exampleMap
 }
 
-func setResponseExampleByInstanceV3(astFile *ast.File, response *spec.Response, attrs string) error {
+func setResponseExampleByInstanceV3(parser *Parser, currTypeSpecDef *TypeSpecDef, astFile *ast.File, response *spec.Response, attrs string) error {
 	if response == nil {
 		return fmt.Errorf("response cannot be nil")
 	}
 
 	attrsArr := splitCommaSeparatedString(attrs)
 	for _, attr := range attrsArr {
-		example, err := getExampleByInstance(astFile, attr)
+		example, err := parser.getExampleByInstance(astFile, currTypeSpecDef, attr)
 		if err != nil {
 			return err
 		}
@@ -668,12 +671,12 @@ func setResponseExampleByInstanceV3(astFile *ast.File, response *spec.Response, 
 	return nil
 }
 
-func getBodyParamExamplesByInstanceV3(astFile *ast.File, attrs string) (map[string]interface{}, error) {
+func getBodyParamExamplesByInstanceV3(parser *Parser, currTypeSpecDef *TypeSpecDef, astFile *ast.File, attrs string) (map[string]interface{}, error) {
 	attrsArr := splitCommaSeparatedString(attrs)
 	examples := make(map[string]interface{})
 
 	for _, attr := range attrsArr {
-		example, err := getExampleByInstance(astFile, attr)
+		example, err := parser.getExampleByInstance(astFile, currTypeSpecDef, attr)
 		if err != nil {
 			return nil, err
 		}
@@ -684,7 +687,7 @@ func getBodyParamExamplesByInstanceV3(astFile *ast.File, attrs string) (map[stri
 	return examples, nil
 }
 
-func setParamExampleByInstanceV3(astFile *ast.File, param *spec.Parameter, attrs string) error {
+func setParamExampleByInstanceV3(parser *Parser, currTypeSpecDef *TypeSpecDef, astFile *ast.File, param *spec.Parameter, attrs string) error {
 	if param == nil {
 		return fmt.Errorf("param cannot be nil")
 	}
@@ -692,7 +695,7 @@ func setParamExampleByInstanceV3(astFile *ast.File, param *spec.Parameter, attrs
 	attrsArr := splitCommaSeparatedString(attrs)
 
 	for _, attr := range attrsArr {
-		example, err := getExampleByInstance(astFile, attr)
+		example, err := parser.getExampleByInstance(astFile, currTypeSpecDef, attr)
 		if err != nil {
 			return err
 		}
@@ -1079,7 +1082,7 @@ func (o *OperationV3) ParseResponseComment(commentLine string, astFile *ast.File
 		mimeType := "application/json" // TODO: set correct mimeType
 		setResponseSchema(response.Spec.Spec, mimeType, schema)
 
-		o.parseResponseAttributeV3(commentLine, response.Spec.Spec, astFile)
+		o.parseResponseAttributeV3(commentLine, strings.TrimSpace(matches[3]), response.Spec.Spec, astFile)
 		o.AddResponse(codeStr, response)
 	}
 

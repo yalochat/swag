@@ -323,6 +323,15 @@ func setspecInfo(openAPI *spec.OpenAPI, attribute, value string) {
 	}
 }
 
+func (parser *Parser) getTypeSpecDefFromSchemaTypeWithPkgNameV3(schemaType string) *TypeSpecDef {
+	for typeDef, schema := range parser.parsedSchemasV3 {
+		if schema.Name == schemaType {
+			return typeDef
+		}
+	}
+	return nil
+}
+
 func parseSecAttributesV3(context string, lines []string, index *int) (string, *spec.SecurityScheme, error) {
 	const (
 		in               = "@in"
