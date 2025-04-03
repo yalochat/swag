@@ -2646,10 +2646,15 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
   fileAST, err := goparser.ParseFile(fileSet, "", src, goparser.ParseComments)
   assert.NoError(t, err)
 
+  structsFilePath := packagePath + "/structs.go"
+  structsSrc, err := os.ReadFile(structsFilePath)
+	assert.NoError(t, err)
+
   parser := New()
-  err = parser.parseFile("github.com/yalochat/swag/testdata/param_structs", "testdata/param_structs/structs.go", nil, ParseModels)
+  err = parser.parseFile("github.com/yalochat/swag/testdata/param_structs", "testdata/param_structs/structs.go", structsSrc, ParseModels)
   assert.NoError(t, err)
-  _, err = parser.packages.ParseTypes()
+  parsedSchemas, err := parser.packages.ParseTypes()
+	parser.parsedSchemas = parsedSchemas
   assert.NoError(t, err)
 
   tests := []struct {
@@ -2705,8 +2710,8 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
       expected: `[
         {
           "example": {
-            "B": true,
-            "Foo": "foo"
+            "b": true,
+            "foo": "foo"
           },
           "description": "Some ID",
           "name": "some_id",
@@ -2724,23 +2729,23 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
       expected: `[
         {
           "example": {
-            "ArrayExample": [
+            "arrayExample": [
               {
-                "B": true,
-                "Foo": "foo"
+                "b": true,
+                "foo": "foo"
               }
             ],
-            "FormModelExample": {
-              "B": true,
-              "Foo": "foo"
+            "formModelExample": {
+              "b": true,
+              "foo": "foo"
             },
-            "MapExample": {
+            "mapExample": {
               "key": {
                 "AnotherHeader": 1,
                 "Token": "token"
               }
             },
-            "PathModelExample": {
+            "pathModelExample": {
               "Identifier": 1,
               "Name": "name"
             }
