@@ -14,6 +14,11 @@ const (
 	BOOLEAN_STRING_FALSE = "false"
 )
 
+/*
+Adds the current package name to the schema type if it doesn't already have one.
+This is useful for further resolving types in the same package as the current file,
+if it is the case.
+*/
 func addPkgToSchemaTypeIfNeeded(schemaType string, astFile *ast.File) string {
 	hasPkgName := strings.Contains(schemaType, ".")
 	if hasPkgName {
@@ -23,6 +28,10 @@ func addPkgToSchemaTypeIfNeeded(schemaType string, astFile *ast.File) string {
 	return fmt.Sprintf("%s.%s", filePkg, schemaType)
 }
 
+/*
+Gets the Type Definition from the schema type. The schema type is passed by the user in the
+annotation, and it is expected to be in the format of <pkgName.TypeName> or just <TypeName>.
+*/
 func (parser *Parser) getTypeSpecDefFromSchemaType(schemaType string, astFile *ast.File) (*TypeSpecDef, error) {
 	if IsPrimitiveType(schemaType) {
 		return nil, nil
@@ -32,6 +41,12 @@ func (parser *Parser) getTypeSpecDefFromSchemaType(schemaType string, astFile *a
 	return parser.getTypeSpecDefFromSchemaTypeWithPkgName(schemaWithPkg)
 }
 
+/*
+Gets the Type Definition from the schema type. The schema type is passed by the user in the
+annotation, and it is expected to be in the format of <pkgName.TypeName> or just <TypeName>.
+For OpenAPI v3, it is used the parsed schemas from parser.parsedSchemasV3, that is why we need
+a separate function
+*/
 func (parser *Parser) getTypeSpecDefFromSchemaTypeV3(schemaType string, astFile *ast.File) (*TypeSpecDef, error) {
 	if IsPrimitiveType(schemaType) {
 		return nil, nil
@@ -41,6 +56,12 @@ func (parser *Parser) getTypeSpecDefFromSchemaTypeV3(schemaType string, astFile 
 	return parser.getTypeSpecDefFromSchemaTypeWithPkgNameV3(schemaWithPkg)
 }
 
+/*
+Entry point to get the example instance from the AST file.
+It will walk through the AST to find the declaration of `attr` and return its value.
+If a struct, it will also use the type definition of the current type spec to resolve
+the JSON tags (if any) and replace the keys in the returned object with the JSON tags.
+*/
 func (parser *Parser) getExampleByInstance(currASTFile *ast.File, currTypeSpecDef *TypeSpecDef, attr string) (interface{}, error) {
 	if currASTFile == nil {
 		return nil, fmt.Errorf("astFile cannot be nil")
@@ -56,8 +77,13 @@ func (parser *Parser) getExampleByInstance(currASTFile *ast.File, currTypeSpecDe
 	return example, nil
 }
 
-
-func (parser *Parser) findPackagePath(pkgName string, imports []*ast.ImportSpec) (string, error) {
+/*
+Gets the package path from the imports object. It is based on how the the package is referenced
+in the file. So if the import has an alias, it will be used to find the package path.
+If the import does not have an alias, it will be used the package name as it is defined in the
+package itself (that is how golang resolves the package name).
+*/
+func (parser *Parser) findPackagePathInImports(pkgName string, imports []*ast.ImportSpec) (string, error) {
 	for _, importObj := range imports {
 		importPath := strings.Trim(importObj.Path.Value, `"`)
 		alias := importObj.Name
@@ -79,6 +105,11 @@ func (parser *Parser) findPackagePath(pkgName string, imports []*ast.ImportSpec)
 	return "", fmt.Errorf("could not find package path for package name: %s", pkgName)
 }
 
+/*
+Goes though the already parsed schemas and finds the type definition for the schema type.
+The `schemaType` should be in the format of <pkgName.TypeName>. Where `pkgName` is the real
+package name and not an alias.
+*/
 func (parser *Parser) getTypeSpecDefFromSchemaTypeWithPkgName(schemaType string) (*TypeSpecDef, error) {
 	for typeDef, schema := range parser.parsedSchemas {
 		if schema.Name == schemaType {
@@ -88,6 +119,13 @@ func (parser *Parser) getTypeSpecDefFromSchemaTypeWithPkgName(schemaType string)
 	return nil, fmt.Errorf("could not find typeSpecDef for schemaType: %s", schemaType)
 }
 
+/*
+Goes though the already parsed schemas and finds the type definition for the schema type.
+The `schemaType` should be in the format of <pkgName.TypeName>. Where `pkgName` is the real
+package name and not an alias.
+For OpenAPI v3, it is used the parsed schemas from parser.parsedSchemasV3, that is why we need
+a separate function
+*/
 func (parser *Parser) getTypeSpecDefFromSchemaTypeWithPkgNameV3(schemaType string) (*TypeSpecDef, error) {
 	for typeDef, schema := range parser.parsedSchemasV3 {
 		if schema.Name == schemaType {
@@ -97,6 +135,11 @@ func (parser *Parser) getTypeSpecDefFromSchemaTypeWithPkgNameV3(schemaType strin
 	return nil, fmt.Errorf("could not find typeSpecDef for schemaType: %s", schemaType)
 }
 
+/*
+Ranges through the packages and finds the package path for the package name.
+The `pkgName` should be the package name as it is defined in the package itself,
+and not an alias.
+*/
 func (parser *Parser) findPackagePathFromPackageName(pkgName string) (string, error) {
 	for pkgPath, pkgDefinition := range parser.packages.packages {
 		if pkgDefinition.Name == pkgName {
@@ -106,6 +149,12 @@ func (parser *Parser) findPackagePathFromPackageName(pkgName string) (string, er
 	return "", fmt.Errorf("could not find package path for package name: %s", pkgName)
 }
 
+/*
+Ranges through the type definitions of a particular package path and returns the type with the name
+<schemaName>.
+<pkgPath> should be the package path and not the package name.
+<schemaName> should be the name of the type without the package prefix.
+*/
 func (parser *Parser) getTypeSpecDefFromSchemaNameAndPkgPath(schemaName string, pkgPath string) (*TypeSpecDef, error) {
 	if typeSpecDef, ok := parser.packages.packages[pkgPath].TypeDefinitions[schemaName]; ok {
 		return typeSpecDef, nil
@@ -113,6 +162,37 @@ func (parser *Parser) getTypeSpecDefFromSchemaNameAndPkgPath(schemaName string, 
 	return nil, fmt.Errorf("could not find typeSpecDef for schemaName: %s and pkgPath: %s", schemaName, pkgPath)
 }
 
+/*
+Parsers the composite literal based on its type.
+It will call the appropriate handler based on the type of the composite literal.
+*/
+func (parser *Parser) parseCompositeLiteral(literal *ast.CompositeLit, typeSpecDef *TypeSpecDef, file *ast.File) interface{} {
+	switch literal.Type.(type) {
+	case *ast.ArrayType:
+		return parser.handleArrayCompositeLiteral(literal, typeSpecDef, file)
+	case *ast.MapType:
+		return parser.handleMapCompositeLiteral(literal, typeSpecDef, file)
+	default:
+		return parser.handleStructCompositeLiteral(literal, typeSpecDef, file)
+	}
+}
+
+/*
+parseExpr parses the expression and returns the value based on its type.
+
+- If the expression type is a basic literal, it will return the value.
+
+- If the expression type is composite literal, it will update the type definition
+associated with it.
+
+- If the expression type is a unary expression, it will return the value of the
+dereferenced expression recursively
+
+- If the expression type is an identifier, it will resolve the value of the identifier
+
+- If the expression type is a selector expression, it will find the package path associated
+with the identifier and then update the current file and type definition in the recursion
+*/
 func (parser *Parser) parseExpr(expr ast.Expr, currSpecDef *TypeSpecDef, file *ast.File, shouldGetNew bool) interface{} {
 	switch astExpr := expr.(type) {
 	case *ast.BasicLit:
@@ -145,7 +225,7 @@ func (parser *Parser) parseExpr(expr ast.Expr, currSpecDef *TypeSpecDef, file *a
 		// Handle package references
 		pkgName := astExpr.X.(*ast.Ident).Name
 		typeName := astExpr.Sel.Name
-		pkgPath, err := parser.findPackagePath(pkgName, file.Imports)
+		pkgPath, err := parser.findPackagePathInImports(pkgName, file.Imports)
 		if err != nil {
 			fmt.Println("Error in selector expr: ", err)
 			return nil
@@ -187,9 +267,18 @@ func (parser *Parser) parseExpr(expr ast.Expr, currSpecDef *TypeSpecDef, file *a
 	}
 }
 
+/*
+Resolves the identifier value in the AST file.
+It will walk through the AST to find the declaration of `identName` and return its value.
+An ast.Ident (short for AST Identifier) represents a name used in Go code. It could be the
+name of a variable, a function, a type, a constant, or even a package. Essentially, an ast.
+Ident is any word in Go that serves as a named entity. 
+
+This function is first used to resolve the value of the example instance. Whenever a new
+identifier is found, this function is called to resolve it.
+*/
 func (parser *Parser) resolveIdentValue(identName string, currTypeSpecDef *TypeSpecDef, file *ast.File, shoulGetNew bool) interface{} {
 	var value interface{}
-	fmt.Println("[resolveIdentValue] IDENT NAME: ", identName)
 	ast.Inspect(file, func(n ast.Node) bool {
 		decl, ok := n.(*ast.ValueSpec)
 		if !ok {
@@ -208,6 +297,9 @@ func (parser *Parser) resolveIdentValue(identName string, currTypeSpecDef *TypeS
 	return value
 }
 
+/*
+Returns the value of the basic literal based on its kind.
+*/
 func parseBasicLiteral(literal *ast.BasicLit) interface{} {
 	switch literal.Kind {
 	case token.INT:
@@ -223,7 +315,7 @@ func parseBasicLiteral(literal *ast.BasicLit) interface{} {
 	case token.STRING:
 		return literal.Value[1 : len(literal.Value)-1] // Remove quotes
 	default:
-		return nil
+		return literal.Value
 	}
 }
 
@@ -245,6 +337,11 @@ func (parser *Parser) handleMapCompositeLiteral(literal *ast.CompositeLit, currS
 	return obj
 }
 
+/*
+Handles the parsing of array composite literals. It always uses the same type definition,
+since the array elements types are always the same. It will return a slice of interface{} 
+with the values of the array.
+*/
 func (parser *Parser) handleArrayCompositeLiteral(literal *ast.CompositeLit, currSpecDef *TypeSpecDef, file *ast.File) []interface{} {
 	var arr []interface{}
 	for _, elem := range literal.Elts {
@@ -254,7 +351,9 @@ func (parser *Parser) handleArrayCompositeLiteral(literal *ast.CompositeLit, cur
 	return arr
 }
 
-
+/*
+Get JSON tag for a field in a struct. If no JSON tag is found, returns empty string.
+*/
 func getJSONTag(field *ast.Field) string {
 	if field.Tag != nil {
 		tagValue := strings.Trim(field.Tag.Value, "`") // Remove backticks
@@ -263,39 +362,36 @@ func getJSONTag(field *ast.Field) string {
 			return strings.Split(jsonTag, ",")[0] // Ignore omitempty, etc.
 		}
 	}
-	return "" // Return empty string if no JSON tag exists
+	return ""
 }
 
+/*
+Range through the fields of a struct and find the JSON tag for a field.
+If the field is found but no JSON tag is found, it returns the field name.
+If the field is not found, it is considered an embedded field.
+*/
 func (parser *Parser) getFieldJSONTag(typeSpecDef *TypeSpecDef, fieldName string) (string, bool) {
 	if typeSpecDef == nil || typeSpecDef.TypeSpec == nil {
 		return fieldName, false
 	}
 
-	fmt.Println("[GET FIELD JSON TAG] PKG PATH: ", typeSpecDef.PkgPath);
-	fmt.Println("[GET FIELD JSON TAG] TYPE NAME: ", typeSpecDef.TypeSpec.Name.Name);
-	wasFieldFound := false
+	isEmbedded := true
 
 	if structType, ok := typeSpecDef.TypeSpec.Type.(*ast.StructType); ok {
 		for _, field := range structType.Fields.List {
 			for _, name := range field.Names {
 				if name.Name == fieldName {
-					fmt.Println("[GET FIELD JSON TAG] FIELD FOUND")
-					wasFieldFound = true
+					isEmbedded = false
 					tag := getJSONTag(field)
 					if tag != "" {
-						fmt.Println("[GET FIELD JSON TAG] TAG: ", tag);
-						return tag, false
+						return tag, isEmbedded
 					}
+					break
 				}
 			}
 		}
 	}
-	if !wasFieldFound {
-		fmt.Printf("%s IS A EMBEDDED STRUCT!!\n", fieldName)
-		return fieldName, true
-	}
-	fmt.Println("[GET FIELD JSON TAG] TAG: ", fieldName);
-	return fieldName, false
+	return fieldName, isEmbedded
 }
 
 func (parser *Parser) getArrayTypeInfo(arrType *ast.ArrayType, imports []*ast.ImportSpec) (pkg string, typeName string) {
@@ -317,32 +413,32 @@ func (parser *Parser) getMapValueTypeInfo(mapType *ast.MapType, imports []*ast.I
 
 // Helper function to extract package and type from an arbitrary expression
 func (parser *Parser) getTypePackageAndName(expr ast.Expr, imports []*ast.ImportSpec) (pkg string, typeName string) {
-	switch t := expr.(type) {
+	switch exprType := expr.(type) {
 	case *ast.Ident:
 		// Local type (no package)
-		return "", t.Name
+		return "", exprType.Name
 
 	case *ast.SelectorExpr:
 		// Selector expression: `pkg.Type`
-		if ident, ok := t.X.(*ast.Ident); ok {
-			pkgPath, err := parser.findPackagePath(ident.Name, imports) // Find full package path
+		if ident, ok := exprType.X.(*ast.Ident); ok {
+			pkgPath, err := parser.findPackagePathInImports(ident.Name, imports) // Find full package path
 			if err != nil {
 				fmt.Println("Error in getTypePackageAndName: ", err)
 			}
-			return pkgPath, t.Sel.Name
+			return pkgPath, exprType.Sel.Name
 		}
 
 	case *ast.StarExpr:
 		// Pointer type: *SomeType
-		return parser.getTypePackageAndName(t.X, imports)
+		return parser.getTypePackageAndName(exprType.X, imports)
 
 	case *ast.ArrayType:
 		// Nested array type (e.g., [][]MyType)
-		return parser.getTypePackageAndName(t.Elt, imports)
+		return parser.getTypePackageAndName(exprType.Elt, imports)
 
 	case *ast.MapType:
 		// Map key/value types
-		return parser.getTypePackageAndName(t.Value, imports)
+		return parser.getTypePackageAndName(exprType.Value, imports)
 
 	case *ast.StructType:
 		// Anonymous struct
@@ -367,7 +463,7 @@ func (parser *Parser) getNewTypeSpecDef(compositeLit *ast.CompositeLit, currType
 		return typeSpecDef, nil
 	case *ast.SelectorExpr:
 		compositePkg := compositeType.X.(*ast.Ident).Name
-		pkgPath, err := parser.findPackagePath(compositePkg, astFile.Imports)
+		pkgPath, err := parser.findPackagePathInImports(compositePkg, astFile.Imports)
 		if err != nil {
 			return nil, fmt.Errorf("error getting package path from *ast.SelectorExpr: %s", err)
 		}
@@ -434,15 +530,4 @@ func (parser *Parser) handleStructCompositeLiteral(literal *ast.CompositeLit, ty
 	}
 
 	return obj
-}
-
-func (parser *Parser) parseCompositeLiteral(literal *ast.CompositeLit, typeSpecDef *TypeSpecDef, file *ast.File) interface{} {
-	switch literal.Type.(type) {
-	case *ast.ArrayType:
-		return parser.handleArrayCompositeLiteral(literal, typeSpecDef, file)
-	case *ast.MapType:
-		return parser.handleMapCompositeLiteral(literal, typeSpecDef, file)
-	default:
-		return parser.handleStructCompositeLiteral(literal, typeSpecDef, file)
-	}
 }
