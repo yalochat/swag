@@ -2646,16 +2646,15 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
   fileAST, err := goparser.ParseFile(fileSet, "", src, goparser.ParseComments)
   assert.NoError(t, err)
 
-  structsFilePath := packagePath + "/structs.go"
-  structsSrc, err := os.ReadFile(structsFilePath)
-	assert.NoError(t, err)
-
   parser := New()
-  err = parser.parseFile("github.com/yalochat/swag/testdata/param_structs", "testdata/param_structs/structs.go", structsSrc, ParseModels)
+  err = parser.parseFile("github.com/yalochat/swag/testdata/param_structs", "testdata/param_structs/structs.go", nil, ParseModels)
   assert.NoError(t, err)
-  parsedSchemas, err := parser.packages.ParseTypes()
-	parser.parsedSchemas = parsedSchemas
+
+	err = parser.parseFile("github.com/yalochat/swag/testdata/param_structs/inner", "testdata/param_structs/inner/inner.go", nil, ParseModels)
   assert.NoError(t, err)
+
+	_, err = parser.packages.ParseTypes()
+	assert.NoError(t, err)
 
   tests := []struct {
     name     string
@@ -2756,6 +2755,28 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
           "required": true,
           "schema": {
             "$ref": "#/definitions/structs.CompositeStruct"
+          }
+        }
+      ]`,
+    },
+		{
+      name:    "Parse params with struct from outside package - example by instance",
+      comment: `@Param some_id body inner.InnerStruct true "Some ID" exampleByInstance(OutsidePkgExample)`,
+      expected: `[
+        {
+          "example": {
+            "awesomeField": "awesome",
+            "formModelExample": {
+              "b": true,
+              "foo": "foo"
+            }
+          },
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "body",
+          "required": true,
+          "schema": {
+            "$ref": "#/definitions/inner.InnerStruct"
           }
         }
       ]`,
