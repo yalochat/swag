@@ -1,9 +1,9 @@
 package structs
 
 type FormModel struct {
-	Foo string `form:"f" binding:"required" validate:"max=10"`
+	Foo string `form:"f" binding:"required" validate:"max=10" json:"foo"`
 	// B is another field
-	B bool
+	B bool `json:"b"`
 }
 
 type AuthHeader struct {
@@ -20,8 +20,8 @@ type PathModel struct {
 }
 
 type CompositeStruct struct {
-	FormModelExample *FormModel
-	PathModelExample PathModel
-	MapExample map[string]AuthHeader
-	ArrayExample []FormModel
+	FormModelExample *FormModel `json:"formModelExample"`
+	PathModelExample PathModel `json:"pathModelExample"`
+	MapExample map[string]AuthHeader `json:"mapExample"`
+	ArrayExample []FormModel `json:"arrayExample"`
 }

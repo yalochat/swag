@@ -438,42 +438,6 @@ func (parser *Parser) skipPackageByPrefix(pkgpath string) bool {
 	return true
 }
 
-func (parser *Parser) findPackagePath(pkgName string, imports []*ast.ImportSpec) (string, error) {
-	for _, imp := range imports {
-		importPath := strings.Trim(imp.Path.Value, `"`)
-		if imp.Name != nil {
-			if imp.Name.Name == pkgName {
-				return importPath, nil
-			}
-			continue
-		}
-
-		if currPkgDefinition, ok := parser.packages.packages[importPath]; ok {
-			if currPkgDefinition.Name == pkgName {
-				return importPath, nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("could not find package path for package name: %s", pkgName)
-}
-
-func (parser *Parser) getTypeSpecDefFromSchemaTypeWithPkgName(schemaType string) *TypeSpecDef {
-	for typeDef, schema := range parser.parsedSchemas {
-		if schema.Name == schemaType {
-			return typeDef
-		}
-	}
-	return nil
-}
-
-func (parser *Parser) getTypeSpecDefFromSchemaNameAndPkgPath(schemaName string, pkgPath string) (*TypeSpecDef, error) {
-	if typeSpecDef, ok := parser.packages.packages[pkgPath].TypeDefinitions[schemaName]; ok {
-		return typeSpecDef, nil
-	}
-	return nil, fmt.Errorf("could not find typeSpecDef for schemaName: %s and pkgPath: %s", schemaName, pkgPath)
-}
-
 // ParseAPIMultiSearchDir is like ParseAPI but for multiple search dirs.
 func (parser *Parser) ParseAPIMultiSearchDir(searchDirs []string, mainAPIFile string, parseDepth int) error {
 	for _, searchDir := range searchDirs {

@@ -1,5 +1,9 @@
 package structs
 
+import (
+	outsidePkg "github.com/yalochat/swag/v2/testdata/param_structs/inner"
+)
+
 var FormModelExample = FormModel {
 	Foo: "foo",
 	B: true,
@@ -18,6 +22,11 @@ var CompositeStructExample = CompositeStruct {
 		},
 	},
 	ArrayExample: []FormModel{FormModelExample},
+}
+
+var OutsidePkgExample = outsidePkg.InnerStruct {
+	AwesomeField: "awesome",
+	FormModelExample: &FormModelExample,
 }
 
 var StringExample = "AwesomeString"

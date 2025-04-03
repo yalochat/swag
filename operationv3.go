@@ -529,7 +529,10 @@ func (o *OperationV3) parseParamAttribute(comment, objectType, schemaType string
 		case collectionFormatTag:
 			err = setCollectionFormatParamV3(param, attrKey, objectType, attr, comment)
 		case exampleByInstanceTag:
-			typeSpecDef := o.parser.getTypeSpecDefFromSchemaTypeWithPkgNameV3(schemaType)
+			typeSpecDef, errTypeSpec := o.parser.getTypeSpecDefFromSchemaTypeV3(schemaType, astFile)
+			if errTypeSpec != nil {
+				return errTypeSpec
+			}
 			err = setParamExampleByInstanceV3(o.parser, typeSpecDef, astFile, param, attr)
 		}
 
@@ -568,10 +571,13 @@ func (o *OperationV3) parseParamAttributeForBody(comment, objectType, schemaType
 		case extensionsTag:
 			paramSchema.Extensions = setExtensionParam(attr)
 		case exampleByInstanceTag:
-			typeSpecDef := o.parser.getTypeSpecDefFromSchemaTypeWithPkgNameV3(schemaType)
-			examples, err := getBodyParamExamplesByInstanceV3(o.parser, typeSpecDef, astFile, attr)
-			if err != nil {
-				return err
+			typeSpecDef, errTypeSpec := o.parser.getTypeSpecDefFromSchemaTypeV3(schemaType, astFile)
+			if errTypeSpec != nil {
+				return errTypeSpec
+			}
+			examples, errGetExamples := getBodyParamExamplesByInstanceV3(o.parser, typeSpecDef, astFile, attr)
+			if errGetExamples != nil {
+				return errGetExamples
 			}
 			o.addExamplesToRequestBody(examples)
 		}
@@ -605,7 +611,10 @@ func (o *OperationV3) parseResponseAttributeV3(comment, schemaType string, respo
 		}
 		switch attrKey {
 		case exampleByInstanceTag:
-			typeSpecDef := o.parser.getTypeSpecDefFromSchemaTypeWithPkgNameV3(schemaType)
+			typeSpecDef, errTypeSpec := o.parser.getTypeSpecDefFromSchemaTypeV3(schemaType, astFile)
+			if errTypeSpec != nil {
+				return errTypeSpec
+			}
 			err = setResponseExampleByInstanceV3(o.parser, typeSpecDef, astFile, response, attr)
 		}
 
