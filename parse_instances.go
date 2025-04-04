@@ -175,13 +175,10 @@ It will call the appropriate handler based on the type of the composite literal.
 func (parser *Parser) parseCompositeLiteral(literal *ast.CompositeLit, currTypeDefinition ast.Expr, file *ast.File) interface{} {
 	switch literal.Type.(type) {
 	case *ast.ArrayType:
-		fmt.Println("ast.ArrayType....")
 		return parser.handleArrayCompositeLiteral(literal, literal.Type.(*ast.ArrayType).Elt, file)
 	case *ast.MapType:
-		fmt.Println("ast.MapType....")
 		return parser.handleMapCompositeLiteral(literal, literal.Type.(*ast.MapType).Value, file)
 	default:
-		fmt.Println("default....")
 		return parser.handleStructCompositeLiteral(literal, literal.Type, file)
 	}
 }
@@ -355,6 +352,10 @@ func getJSONTag(field *ast.Field) string {
 	return ""
 }
 
+/*
+Gets the type schema from the type definition of the struct. It will check if the type definition
+is a pointer, a selector expression, or a identifier.
+*/
 func (parser *Parser) getTypeSchemaFromTypeDefinition(typeDefinition ast.Expr, astFile *ast.File) (ast.Expr, error) {
 	switch castTypeDef := typeDefinition.(type) {
 	case *ast.Ident:
@@ -383,7 +384,7 @@ func (parser *Parser) getTypeSchemaFromTypeDefinition(typeDefinition ast.Expr, a
 		return parser.getTypeSchemaFromTypeDefinition(castTypeDef.X, astFile)
 
 	default:
-		return nil, fmt.Errorf("unsupported type: %s", fmt.Sprintf("%T", typeDefinition))
+		return typeDefinition, nil
 	}
 }
 
@@ -419,6 +420,13 @@ func (parser *Parser) getFieldJSONTag(typeDefinition ast.Expr, fieldName string,
 	return fieldName, isEmbedded
 }
 
+/*
+Handles the parsing of struct composite literals. It will go through the fields
+of the struct and find the JSON tag for each field. If no JSON tag is found,
+it will use the field name as the key.
+It will also handle embedded structs by flattening them into the parent struct.
+Returns a map[string]interface{} with the values of the struct.
+*/
 func (parser *Parser) handleStructCompositeLiteral(literal *ast.CompositeLit, currTypeDefinition ast.Expr, file *ast.File) interface{} {	
 	obj := make(map[string]interface{})
 	embeddedKeys := []string{} 
