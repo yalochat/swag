@@ -160,8 +160,10 @@ Ranges through the type definitions of a particular package path and returns the
 <schemaName> should be the name of the type without the package prefix.
 */
 func (parser *Parser) getTypeSpecDefFromSchemaNameAndPkgPath(schemaName string, pkgPath string) (*TypeSpecDef, error) {
-	if typeSpecDef, ok := parser.packages.packages[pkgPath].TypeDefinitions[schemaName]; ok {
-		return typeSpecDef, nil
+	if pkgDefinition, ok := parser.packages.packages[pkgPath]; ok {
+		if typeSpecDef, ok := pkgDefinition.TypeDefinitions[schemaName]; ok {
+			return typeSpecDef, nil
+		}
 	}
 	return nil, fmt.Errorf("could not find typeSpecDef for schemaName: %s and pkgPath: %s", schemaName, pkgPath)
 }

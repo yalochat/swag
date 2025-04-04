@@ -2647,10 +2647,10 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
   assert.NoError(t, err)
 
   parser := New()
-  err = parser.parseFile("github.com/yalochat/swag/testdata/param_structs", "testdata/param_structs/structs.go", nil, ParseModels)
+  err = parser.parseFile("github.com/yalochat/swag/v2/testdata/param_structs", "testdata/param_structs/structs.go", nil, ParseModels)
   assert.NoError(t, err)
 
-	err = parser.parseFile("github.com/yalochat/swag/testdata/param_structs/inner", "testdata/param_structs/inner/inner.go", nil, ParseModels)
+	err = parser.parseFile("github.com/yalochat/swag/v2/testdata/param_structs/inner", "testdata/param_structs/inner/inner.go", nil, ParseModels)
   assert.NoError(t, err)
 
 	_, err = parser.packages.ParseTypes()
@@ -2759,32 +2759,32 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
         }
       ]`,
     },
-		// {
-    //   name:    "Parse params with struct from outside package - example by instance",
-    //   comment: `@Param some_id body inner.InnerStruct true "Some ID" exampleByInstance(OutsidePkgExample)`,
-    //   expected: `[
-    //     {
-    //       "example": {
-    //         "awesomeField": "awesome",
-    //         "mapField": {
-    //           "key": 1,
-    //           "key2": 2
-    //         },
-		// 				"mapToArray": {
-		// 				  "key": ["value1", "value2"],
-		// 					"key2": ["value3", "value4"]
-		// 				}
-    //       },
-    //       "description": "Some ID",
-    //       "name": "some_id",
-    //       "in": "body",
-    //       "required": true,
-    //       "schema": {
-    //         "$ref": "#/definitions/inner.InnerStruct"
-    //       }
-    //     }
-    //   ]`,
-    // },
+		{
+      name:    "Parse params with struct from outside package - example by instance",
+      comment: `@Param some_id body inner.InnerStruct true "Some ID" exampleByInstance(OutsidePkgExample)`,
+      expected: `[
+        {
+          "example": {
+            "awesomeField": "awesome",
+            "mapField": {
+              "key": 1,
+              "key2": 2
+            },
+						"mapToArray": {
+						  "key": ["value1", "value2"],
+							"key2": ["value3", "value4"]
+						}
+          },
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "body",
+          "required": true,
+          "schema": {
+            "$ref": "#/definitions/inner.InnerStruct"
+          }
+        }
+      ]`,
+    },
 		{
       name:    "Parse params with embedded struct - example by instance",
       comment: `@Param some_id body EmbeddedStruct true "Some ID" exampleByInstance(EmbeddedStructExample)`,
