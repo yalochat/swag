@@ -2766,10 +2766,14 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
         {
           "example": {
             "awesomeField": "awesome",
-            "formModelExample": {
-              "b": true,
-              "foo": "foo"
-            }
+            "mapField": {
+              "key": 1,
+              "key2": 2
+            },
+						"mapToArray": {
+						  "key": ["value1", "value2"],
+							"key2": ["value3", "value4"]
+						}
           },
           "description": "Some ID",
           "name": "some_id",
@@ -2777,6 +2781,26 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
           "required": true,
           "schema": {
             "$ref": "#/definitions/inner.InnerStruct"
+          }
+        }
+      ]`,
+    },
+		{
+      name:    "Parse params with embedded struct - example by instance",
+      comment: `@Param some_id body EmbeddedStruct true "Some ID" exampleByInstance(EmbeddedStructExample)`,
+      expected: `[
+        {
+          "example": {
+            "awesomeField": "awesome",
+						"b": true,
+						"foo": "foo"
+          },
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "body",
+          "required": true,
+          "schema": {
+            "$ref": "#/definitions/structs.EmbeddedStruct"
           }
         }
       ]`,

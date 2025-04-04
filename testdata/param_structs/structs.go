@@ -25,3 +25,8 @@ type CompositeStruct struct {
 	MapExample map[string]AuthHeader `json:"mapExample"`
 	ArrayExample []FormModel `json:"arrayExample"`
 }
+
+type EmbeddedStruct struct {
+	FormModel
+	AwesomeField string `json:"awesomeField"`
+}
