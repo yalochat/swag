@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -73,7 +72,7 @@ func (parser *Parser) getExampleByInstance(currASTFile *ast.File, currTypeSpecDe
 	if currTypeSpecDef != nil {
 		typeDefition = currTypeSpecDef.TypeSpec.Type
 	}
-	example, identFound := parser.resolveIdentValue(attr, typeDefition, currASTFile, false)
+	example, identFound := parser.resolveIdentValue(attr, typeDefition, currASTFile)
 
 	if !identFound {
 		return nil, fmt.Errorf("example instance not found or unsupported type")
@@ -181,7 +180,7 @@ func (parser *Parser) parseCompositeLiteral(literal *ast.CompositeLit, currTypeD
 		return parser.handleMapCompositeLiteral(literal, literal.Type.(*ast.MapType).Value, file)
 	default:
 		fmt.Println("default....")
-		return parser.handleStructCompositeLiteral(literal, currTypeDefinition, file)
+		return parser.handleStructCompositeLiteral(literal, literal.Type, file)
 	}
 }
 
@@ -204,29 +203,18 @@ parse it recursively. It will also check if the identifier is a boolean string
 with the identifier, update the current file and type definition, and recursively
 parse its value.
 */
-func (parser *Parser) parseExpr(expr ast.Expr, currTypeDefinition ast.Expr, file *ast.File, shouldUpdateType bool) interface{} {
+func (parser *Parser) parseExpr(expr ast.Expr, currTypeDefinition ast.Expr, file *ast.File) interface{} {
 	switch astExpr := expr.(type) {
 	case *ast.BasicLit:
 		return parseBasicLiteral(astExpr)
 	case *ast.CompositeLit:
-		log.Println("Composite literal... ")
-		typeSpecDef := currTypeDefinition
-		var err error
-		if shouldUpdateType {
-			typeSpecDef, err = parser.getNewTypeSpecDef(astExpr, currTypeDefinition, file)
-			if err != nil {
-				fmt.Println("Error in getNewTypeSpecDef: ", err)
-				return nil
-			}
-		}
 		if astExpr.Type == nil {
 			astExpr.Type = currTypeDefinition
 		}
-		log.Println("Composite literal... 2! ")
-		return parser.parseCompositeLiteral(astExpr, typeSpecDef, file) // Nested structs or arrays
+		return parser.parseCompositeLiteral(astExpr, currTypeDefinition, file) // Nested structs or arrays
 	case *ast.UnaryExpr:
 		if astExpr.Op == token.AND {
-			return parser.parseExpr(astExpr.X, currTypeDefinition, file, shouldUpdateType) // Dereference and parse the value
+			return parser.parseExpr(astExpr.X, currTypeDefinition, file) // Dereference and parse the value
 		}
 		return nil
 	case *ast.Ident:
@@ -236,14 +224,13 @@ func (parser *Parser) parseExpr(expr ast.Expr, currTypeDefinition ast.Expr, file
 			return false
 		}
 		// Handle variable references
-		value, _ := parser.resolveIdentValue(astExpr.Name, currTypeDefinition, file, shouldUpdateType)
+		value, _ := parser.resolveIdentValue(astExpr.Name, currTypeDefinition, file)
 		return value
 
 	case *ast.SelectorExpr:
 		// Handle package references
 		pkgName := astExpr.X.(*ast.Ident).Name
 		typeName := astExpr.Sel.Name
-		fmt.Println("SelectorExpr!!!!!: ", pkgName, typeName)
 		pkgPath, err := parser.findPackagePathInImports(pkgName, file.Imports)
 		if err != nil {
 			fmt.Println("Error in selector expr: ", err)
@@ -252,7 +239,7 @@ func (parser *Parser) parseExpr(expr ast.Expr, currTypeDefinition ast.Expr, file
 
 		if packageDefinition, ok := parser.packages.packages[pkgPath]; ok {
 			for _, pkgFile := range packageDefinition.Files {
-				value, identFound := parser.resolveIdentValue(typeName, nil, pkgFile, true)
+				value, identFound := parser.resolveIdentValue(typeName, nil, pkgFile)
 				if identFound {
 					return value
 				}
@@ -276,7 +263,7 @@ Ident is any word in Go that serves as a named entity.
 This function is first used to resolve the value of the example instance. Whenever a new
 identifier is found, this function is called to resolve it.
 */
-func (parser *Parser) resolveIdentValue(identName string, currTypeDefinition ast.Expr, file *ast.File, shoulGetNew bool) (interface{}, bool) {
+func (parser *Parser) resolveIdentValue(identName string, currTypeDefinition ast.Expr, file *ast.File) (interface{}, bool) {
 	var value interface{}
 	identFound := false
 	ast.Inspect(file, func(n ast.Node) bool {
@@ -287,7 +274,7 @@ func (parser *Parser) resolveIdentValue(identName string, currTypeDefinition ast
 
 		for i, name := range decl.Names {
 			if name.Name == identName && len(decl.Values) > i {
-				value = parser.parseExpr(decl.Values[i], currTypeDefinition, file, shoulGetNew)
+				value = parser.parseExpr(decl.Values[i], currTypeDefinition, file)
 				identFound = true
 				return false // Stop walking
 			}
@@ -324,10 +311,8 @@ func (parser *Parser) handleMapCompositeLiteral(literal *ast.CompositeLit, currT
 	obj := make(map[string]interface{})
 	for _, compositeElement := range literal.Elts {
 		if keyValueExpr, ok := compositeElement.(*ast.KeyValueExpr); ok {
-			fmt.Println("keyValueExpr.Key ------> ", keyValueExpr.Key)
-			key := parser.parseExpr(keyValueExpr.Key, currTypeDefinition, file, true)
-			fmt.Println("keyValueExpr.Value ------> ", keyValueExpr.Value)
-			value := parser.parseExpr(keyValueExpr.Value, currTypeDefinition, file, true)
+			key := parser.parseExpr(keyValueExpr.Key, currTypeDefinition, file)
+			value := parser.parseExpr(keyValueExpr.Value, currTypeDefinition, file)
 
 			// Ensure key is a string (convert if needed)
 			keyStr, ok := key.(string)
@@ -348,7 +333,7 @@ with the values of the array.
 func (parser *Parser) handleArrayCompositeLiteral(literal *ast.CompositeLit, currTypeDefinition ast.Expr, file *ast.File) []interface{} {
 	var arr []interface{}
 	for _, elem := range literal.Elts {
-		value := parser.parseExpr(elem, currTypeDefinition, file, true)
+		value := parser.parseExpr(elem, currTypeDefinition, file)
 		arr = append(arr, value)
 	}
 	return arr
@@ -368,19 +353,53 @@ func getJSONTag(field *ast.Field) string {
 	return ""
 }
 
+func (parser *Parser) getTypeSchemaFromTypeDefinition(typeDefinition ast.Expr, astFile *ast.File) (ast.Expr, error) {
+	switch castTypeDef := typeDefinition.(type) {
+	case *ast.Ident:
+		pkgPath, _ := parser.findPackagePathFromPackageName(astFile.Name.Name)
+		typeSpecDef, err := parser.getTypeSpecDefFromSchemaNameAndPkgPath(castTypeDef.Name, pkgPath)
+		if err != nil {
+			return nil, fmt.Errorf("error getting type schema from *ast.Ident: %s", err)
+		}
+		return typeSpecDef.TypeSpec.Type, nil
+	
+	case *ast.SelectorExpr:
+		compositePkg := castTypeDef.X.(*ast.Ident).Name
+		pkgPath, err := parser.findPackagePathInImports(compositePkg, astFile.Imports)
+		if err != nil {
+			return nil, fmt.Errorf("error getting package path from *ast.SelectorExpr: %s", err)
+		}
+
+		typeSpecDef, err := parser.getTypeSpecDefFromSchemaNameAndPkgPath(castTypeDef.Sel.Name, pkgPath)
+		if err != nil {
+			return nil, fmt.Errorf("error getting type schema from *ast.SelectorExpr: %s", err)
+		}
+
+		return typeSpecDef.TypeSpec.Type, nil
+	
+	case *ast.StarExpr:
+		return parser.getTypeSchemaFromTypeDefinition(castTypeDef.X, astFile)
+
+	default:
+		return nil, fmt.Errorf("unsupported type: %s", fmt.Sprintf("%T", typeDefinition))
+	}
+}
+
 /*
 Range through the fields of a struct and find the JSON tag for a field.
 If the field is found but no JSON tag is found, it returns the field name.
 If the field is not found, it is considered an embedded field.
 */
-func (parser *Parser) getFieldJSONTag(typeDefintion ast.Expr, fieldName string) (string, bool) {
+func (parser *Parser) getFieldJSONTag(typeDefinition ast.Expr, fieldName string, astFile *ast.File) (string, bool) {
 	isEmbedded := true
 
-	if selectorType, ok := typeDefintion.(*ast.SelectorExpr); ok {
-		fmt.Println("IS A SELECTOR!: ", fieldName, selectorType.Sel.Name, selectorType.X.(*ast.Ident).Name)
+	typeSchema, err := parser.getTypeSchemaFromTypeDefinition(typeDefinition, astFile)
+	if err != nil {
+		fmt.Println("Error getting type schema from type definition: ", err)
+		return fieldName, false
 	}
 
-	if structType, ok := typeDefintion.(*ast.StructType); ok {
+	if structType, ok := typeSchema.(*ast.StructType); ok {
 		for _, field := range structType.Fields.List {
 			for _, name := range field.Names {
 				if name.Name == fieldName {
@@ -393,123 +412,9 @@ func (parser *Parser) getFieldJSONTag(typeDefintion ast.Expr, fieldName string) 
 				}
 			}
 		}
-	} else {
-		fmt.Println("Type is not a struct: ", typeDefintion)
 	}
+
 	return fieldName, isEmbedded
-}
-
-func (parser *Parser) getArrayTypeInfo(arrType *ast.ArrayType, imports []*ast.ImportSpec) (pkg string, typeName string) {
-	if arrType == nil {
-		return "", ""
-	}
-
-	return parser.getTypePackageAndName(arrType.Elt, imports)
-}
-
-func (parser *Parser) getMapValueTypeInfo(mapType *ast.MapType, imports []*ast.ImportSpec) (valuePkg, valueType string) {
-	if mapType == nil {
-		return "", ""
-	}
-	valuePkg, valueType = parser.getTypePackageAndName(mapType.Value, imports)
-	return valuePkg, valueType
-}
-
-// Helper function to extract package and type from an arbitrary expression
-func (parser *Parser) getTypePackageAndName(expr ast.Expr, imports []*ast.ImportSpec) (pkg string, typeName string) {
-	fmt.Println("MAP TYPE: ", expr)
-	switch exprType := expr.(type) {
-	case *ast.Ident:
-		validSchemaType := TransToValidSchemeType(exprType.Name)
-		return "", validSchemaType
-	case *ast.SelectorExpr:
-	
-		// Selector expression: `pkg.Type`
-		if ident, ok := exprType.X.(*ast.Ident); ok {
-			pkgPath, err := parser.findPackagePathInImports(ident.Name, imports) // Find full package path
-			if err != nil {
-				fmt.Println("Error in getTypePackageAndName: ", err)
-			}
-			return pkgPath, exprType.Sel.Name
-		}
-
-	case *ast.StarExpr:
-		// Pointer type: *SomeType
-		return parser.getTypePackageAndName(exprType.X, imports)
-
-	case *ast.ArrayType:
-		// Nested array type (e.g., [][]MyType)
-		return parser.getTypePackageAndName(exprType.Elt, imports)
-
-	case *ast.MapType:
-		// Map key/value types
-		return parser.getTypePackageAndName(exprType.Value, imports)
-
-	case *ast.StructType:
-		// Anonymous struct
-		return "", "struct"
-
-	case *ast.InterfaceType:
-		// Anonymous interface
-		return "", "interface"
-	}
-
-	return "", ""
-}
-
-func (parser *Parser) getNewTypeSpecDef(compositeLit *ast.CompositeLit, currTypeDefinition ast.Expr, astFile *ast.File) (ast.Expr, error) {
-	switch compositeType := compositeLit.Type.(type) {
-	case *ast.Ident:
-		pkgPath, _ := parser.findPackagePathFromPackageName(astFile.Name.Name)
-		typeSpecDef, err := parser.getTypeSpecDefFromSchemaNameAndPkgPath(compositeType.Name, pkgPath)
-		if err != nil {
-			return nil, fmt.Errorf("error getting new type spec def from *ast.Ident: %s", err)
-		}
-		return typeSpecDef.TypeSpec.Type, nil
-	case *ast.SelectorExpr:
-		compositePkg := compositeType.X.(*ast.Ident).Name
-		pkgPath, err := parser.findPackagePathInImports(compositePkg, astFile.Imports)
-		if err != nil {
-			return nil, fmt.Errorf("error getting package path from *ast.SelectorExpr: %s", err)
-		}
-		typeSpecDef, err := parser.getTypeSpecDefFromSchemaNameAndPkgPath(compositeType.Sel.Name, pkgPath)
-		if err != nil {
-			return nil, fmt.Errorf("error getting new type spec def from *ast.SelectorExpr: %s", err)
-		}
-		return typeSpecDef.TypeSpec.Type, nil
-	case *ast.ArrayType:
-		pkgPath, typeName := parser.getArrayTypeInfo(compositeType, astFile.Imports)
-		if IsPrimitiveType(typeName) {
-			return nil, nil
-		}
-		if pkgPath == "" {
-			pkgPath, _ = parser.findPackagePathFromPackageName(astFile.Name.Name)
-		}
-		typeSpecDef, err := parser.getTypeSpecDefFromSchemaNameAndPkgPath(typeName, pkgPath)
-		if err != nil {
-			return nil, fmt.Errorf("error getting new type spec def from *ast.ArrayType: %s", err)
-		}
-		return typeSpecDef.TypeSpec.Type, nil
-	case *ast.MapType:
-		pkgPath, typeName := parser.getMapValueTypeInfo(compositeType, astFile.Imports)
-		if IsPrimitiveType(typeName) {
-			fmt.Println("primitive type in map: ", typeName)
-			return nil, nil
-		}
-		if pkgPath == "" {
-			pkgPath, _ = parser.findPackagePathFromPackageName(astFile.Name.Name)
-		}
-		typeSpecDef, err := parser.getTypeSpecDefFromSchemaNameAndPkgPath(typeName, pkgPath)
-		if err != nil {
-			return nil, fmt.Errorf("error getting new type spec def from *ast.MapType: %s", err)
-		}
-		return typeSpecDef.TypeSpec.Type, nil
-	case nil:
-		return currTypeDefinition, nil
-	default:
-		fmt.Printf("unsupported composite type: %T\n", compositeType)
-		return nil, nil
-	}
 }
 
 func (parser *Parser) handleStructCompositeLiteral(literal *ast.CompositeLit, currTypeDefinition ast.Expr, file *ast.File) interface{} {	
@@ -518,14 +423,13 @@ func (parser *Parser) handleStructCompositeLiteral(literal *ast.CompositeLit, cu
 	for _, compositeElement := range literal.Elts {
 		if keyValueExpr, ok := compositeElement.(*ast.KeyValueExpr); ok {
 			if key, ok := keyValueExpr.Key.(*ast.Ident); ok {
-				tag, isEmbedded := parser.getFieldJSONTag(currTypeDefinition, key.Name)
+				tag, isEmbedded := parser.getFieldJSONTag(currTypeDefinition, key.Name, file)
 				if isEmbedded {
 					embeddedKeys = append(embeddedKeys, tag)
 				}
-				obj[tag] = parser.parseExpr(keyValueExpr.Value, currTypeDefinition, file, true)
+				obj[tag] = parser.parseExpr(keyValueExpr.Value, currTypeDefinition, file)
 			}
 		}
-		fmt.Println("NOT OK")
 	}
 
 	// If there are embedded structs, we need to flatten the struct

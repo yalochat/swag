@@ -102,7 +102,7 @@ func TestGetFieldJSONTag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.fieldName, func(t *testing.T) {
-			tag, embedded := parser.getFieldJSONTag(tt.typeSpecDef.TypeSpec.Type, tt.fieldName)
+			tag, embedded := parser.getFieldJSONTag(tt.typeSpecDef.TypeSpec.Type, tt.fieldName, &ast.File{})
 			if tag != tt.expectedTag || embedded != tt.expectedEmb {
 				t.Errorf("Expected (%s, %v), got (%s, %v)", tt.expectedTag, tt.expectedEmb, tag, embedded)
 			}
