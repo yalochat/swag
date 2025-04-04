@@ -495,11 +495,7 @@ func (operation *Operation) parseParamAttribute(comment, objectType, schemaType,
 		case collectionFormatTag:
 			err = setCollectionFormatParam(param, attrKey, objectType, attr, comment)
 		case exampleByInstanceTag:
-			typeSpecDef, errTypeSpec := operation.parser.getTypeSpecDefFromSchemaType(schemaType, astFile)
-			if errTypeSpec != nil {
-				return errTypeSpec
-			}
-			err = setParamExampleByInstance(operation.parser, typeSpecDef, astFile, param, attr)
+			err = setParamExampleByInstance(operation.parser, astFile, param, attr)
 		}
 
 		if err != nil {
@@ -518,11 +514,7 @@ func (operation *Operation) parseResponseAttribute(comment, schemaType string, r
 		}
 		switch attrKey {
 		case exampleByInstanceTag:
-			typeSpecDef, errTypeSpec := operation.parser.getTypeSpecDefFromSchemaType(schemaType, astFile)
-			if errTypeSpec != nil {
-				return errTypeSpec
-			}
-			err = setResponseExampleByInstance(operation.parser, typeSpecDef, astFile, response, attr)
+			err = setResponseExampleByInstance(operation.parser, astFile, response, attr)
 		}
 
 		if err != nil {
@@ -532,12 +524,13 @@ func (operation *Operation) parseResponseAttribute(comment, schemaType string, r
 	return nil
 }
 
-func setParamExampleByInstance(parser *Parser, currSpecDef *TypeSpecDef, astFile *ast.File, param *spec.Parameter, attr string) error {
+func setParamExampleByInstance(parser *Parser, astFile *ast.File, param *spec.Parameter, attr string) error {
 	if param == nil {
 		return fmt.Errorf("param cannot be nil")
 	}
 
-	example, err := parser.getExampleByInstance(astFile, currSpecDef, attr)
+	
+	example, err := parser.getExampleByInstance(astFile, attr)
 	if err != nil {
 		return err
 	}
@@ -546,12 +539,12 @@ func setParamExampleByInstance(parser *Parser, currSpecDef *TypeSpecDef, astFile
 	return nil
 }
 
-func setResponseExampleByInstance(parser *Parser, currSpecDef *TypeSpecDef, astFile *ast.File, response *spec.Response, attr string) error {
+func setResponseExampleByInstance(parser *Parser, astFile *ast.File, response *spec.Response, attr string) error {
 	if response == nil {
 		return fmt.Errorf("response cannot be nil")
 	}
 
-	example, err := parser.getExampleByInstance(astFile, currSpecDef, attr)
+	example, err := parser.getExampleByInstance(astFile, attr)
 	if err != nil {
 		return err
 	}

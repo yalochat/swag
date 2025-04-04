@@ -15,64 +15,18 @@ const (
 )
 
 /*
-Adds the current package name to the schema type if it doesn't already have one.
-This is useful for further resolving types in the same package as the current file,
-if it is the case.
-*/
-func addPkgToSchemaTypeIfNeeded(schemaType string, astFile *ast.File) string {
-	hasPkgName := strings.Contains(schemaType, ".")
-	if hasPkgName {
-		return schemaType
-	}
-	filePkg := astFile.Name.Name
-	return fmt.Sprintf("%s.%s", filePkg, schemaType)
-}
-
-/*
-Gets the Type Definition from the schema type. The schema type is passed by the user in the
-annotation, and it is expected to be in the format of <pkgName.TypeName> or just <TypeName>.
-*/
-func (parser *Parser) getTypeSpecDefFromSchemaType(schemaType string, astFile *ast.File) (*TypeSpecDef, error) {
-	if IsPrimitiveType(schemaType) {
-		return nil, nil
-	}
-
-	schemaWithPkg := addPkgToSchemaTypeIfNeeded(schemaType, astFile)
-	return parser.getTypeSpecDefFromSchemaTypeWithPkgName(schemaWithPkg)
-}
-
-/*
-Gets the Type Definition from the schema type. The schema type is passed by the user in the
-annotation, and it is expected to be in the format of <pkgName.TypeName> or just <TypeName>.
-For OpenAPI v3, it is used the parsed schemas from parser.parsedSchemasV3, that is why we need
-a separate function
-*/
-func (parser *Parser) getTypeSpecDefFromSchemaTypeV3(schemaType string, astFile *ast.File) (*TypeSpecDef, error) {
-	if IsPrimitiveType(schemaType) {
-		return nil, nil
-	}
-
-	schemaWithPkg := addPkgToSchemaTypeIfNeeded(schemaType, astFile)
-	return parser.getTypeSpecDefFromSchemaTypeWithPkgNameV3(schemaWithPkg)
-}
-
-/*
 Entry point to get the example instance from the AST file.
 It will walk through the AST to find the declaration of `attr` and return its value.
 If a struct, it will also use the type definition of the current type spec to resolve
 the JSON tags (if any) and replace the keys in the returned object with the JSON tags.
 */
-func (parser *Parser) getExampleByInstance(currASTFile *ast.File, currTypeSpecDef *TypeSpecDef, attr string) (interface{}, error) {
+func (parser *Parser) getExampleByInstance(currASTFile *ast.File, attr string) (interface{}, error) {
 	if currASTFile == nil {
 		return nil, fmt.Errorf("astFile cannot be nil")
 	}
 
 	// Walk through the AST to find the declaration of `attr`
-	var typeDefition ast.Expr
-	if currTypeSpecDef != nil {
-		typeDefition = currTypeSpecDef.TypeSpec.Type
-	}
-	example, identFound := parser.resolveIdentValue(attr, typeDefition, currASTFile)
+	example, identFound := parser.resolveIdentValue(attr, nil, currASTFile)
 
 	if !identFound {
 		return nil, fmt.Errorf("example instance not found or unsupported type")
@@ -107,36 +61,6 @@ func (parser *Parser) findPackagePathInImports(pkgName string, imports []*ast.Im
 	}
 
 	return "", fmt.Errorf("could not find package path for package name: %s", pkgName)
-}
-
-/*
-Goes though the already parsed schemas and finds the type definition for the schema type.
-The `schemaType` should be in the format of <pkgName.TypeName>. Where `pkgName` is the real
-package name and not an alias.
-*/
-func (parser *Parser) getTypeSpecDefFromSchemaTypeWithPkgName(schemaType string) (*TypeSpecDef, error) {
-	for typeDef, schema := range parser.parsedSchemas {
-		if schema.Name == schemaType {
-			return typeDef, nil
-		}
-	}
-	return nil, fmt.Errorf("could not find typeSpecDef for schemaType: %s", schemaType)
-}
-
-/*
-Goes though the already parsed schemas and finds the type definition for the schema type.
-The `schemaType` should be in the format of <pkgName.TypeName>. Where `pkgName` is the real
-package name and not an alias.
-For OpenAPI v3, it is used the parsed schemas from parser.parsedSchemasV3, that is why we need
-a separate function
-*/
-func (parser *Parser) getTypeSpecDefFromSchemaTypeWithPkgNameV3(schemaType string) (*TypeSpecDef, error) {
-	for typeDef, schema := range parser.parsedSchemasV3 {
-		if schema.Name == schemaType {
-			return typeDef, nil
-		}
-	}
-	return nil, fmt.Errorf("could not find typeSpecDef for schemaType: %s", schemaType)
 }
 
 /*
@@ -263,25 +187,25 @@ This function is first used to resolve the value of the example instance. Whenev
 identifier is found, this function is called to resolve it.
 */
 func (parser *Parser) resolveIdentValue(identName string, currTypeDefinition ast.Expr, file *ast.File) (interface{}, bool) {
-	var value interface{}
-	identFound := false
-	ast.Inspect(file, func(n ast.Node) bool {
-		decl, ok := n.(*ast.ValueSpec)
-		if !ok {
-			return true
-		}
-
-		for i, name := range decl.Names {
-			if name.Name == identName && len(decl.Values) > i {
-				value = parser.parseExpr(decl.Values[i], currTypeDefinition, file)
-				identFound = true
-				return false // Stop walking
+		var value interface{}
+		identFound := false
+		ast.Inspect(file, func(n ast.Node) bool {
+			decl, ok := n.(*ast.ValueSpec)
+			if !ok {
+				return true
 			}
-		}
-		return true
-	})
 
-	return value, identFound
+			for i, name := range decl.Names {
+				if name.Name == identName && len(decl.Values) > i {
+					value = parser.parseExpr(decl.Values[i], currTypeDefinition, file)
+					identFound = true
+					return false // Stop walking
+				}
+			}
+			return true
+		})
+
+		return value, identFound
 }
 
 /*

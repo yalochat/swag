@@ -529,11 +529,7 @@ func (o *OperationV3) parseParamAttribute(comment, objectType, schemaType string
 		case collectionFormatTag:
 			err = setCollectionFormatParamV3(param, attrKey, objectType, attr, comment)
 		case exampleByInstanceTag:
-			typeSpecDef, errTypeSpec := o.parser.getTypeSpecDefFromSchemaTypeV3(schemaType, astFile)
-			if errTypeSpec != nil {
-				return errTypeSpec
-			}
-			err = setParamExampleByInstanceV3(o.parser, typeSpecDef, astFile, param, attr)
+			err = setParamExampleByInstanceV3(o.parser, astFile, param, attr)
 		}
 
 		if err != nil {
@@ -571,11 +567,7 @@ func (o *OperationV3) parseParamAttributeForBody(comment, objectType, schemaType
 		case extensionsTag:
 			paramSchema.Extensions = setExtensionParam(attr)
 		case exampleByInstanceTag:
-			typeSpecDef, errTypeSpec := o.parser.getTypeSpecDefFromSchemaTypeV3(schemaType, astFile)
-			if errTypeSpec != nil {
-				return errTypeSpec
-			}
-			examples, errGetExamples := getBodyParamExamplesByInstanceV3(o.parser, typeSpecDef, astFile, attr)
+			examples, errGetExamples := getBodyParamExamplesByInstanceV3(o.parser, astFile, attr)
 			if errGetExamples != nil {
 				return errGetExamples
 			}
@@ -611,11 +603,7 @@ func (o *OperationV3) parseResponseAttributeV3(comment, schemaType string, respo
 		}
 		switch attrKey {
 		case exampleByInstanceTag:
-			typeSpecDef, errTypeSpec := o.parser.getTypeSpecDefFromSchemaTypeV3(schemaType, astFile)
-			if errTypeSpec != nil {
-				return errTypeSpec
-			}
-			err = setResponseExampleByInstanceV3(o.parser, typeSpecDef, astFile, response, attr)
+			err = setResponseExampleByInstanceV3(o.parser, astFile, response, attr)
 		}
 
 		if err != nil {
@@ -662,14 +650,14 @@ func addExampleToExamplesMap(exampleMap ExampleMapT, exampleKey string, exampleV
 	return exampleMap
 }
 
-func setResponseExampleByInstanceV3(parser *Parser, currTypeSpecDef *TypeSpecDef, astFile *ast.File, response *spec.Response, attrs string) error {
+func setResponseExampleByInstanceV3(parser *Parser, astFile *ast.File, response *spec.Response, attrs string) error {
 	if response == nil {
 		return fmt.Errorf("response cannot be nil")
 	}
 
 	attrsArr := splitCommaSeparatedString(attrs)
 	for _, attr := range attrsArr {
-		example, err := parser.getExampleByInstance(astFile, currTypeSpecDef, attr)
+		example, err := parser.getExampleByInstance(astFile, attr)
 		if err != nil {
 			return err
 		}
@@ -680,12 +668,12 @@ func setResponseExampleByInstanceV3(parser *Parser, currTypeSpecDef *TypeSpecDef
 	return nil
 }
 
-func getBodyParamExamplesByInstanceV3(parser *Parser, currTypeSpecDef *TypeSpecDef, astFile *ast.File, attrs string) (map[string]interface{}, error) {
+func getBodyParamExamplesByInstanceV3(parser *Parser, astFile *ast.File, attrs string) (map[string]interface{}, error) {
 	attrsArr := splitCommaSeparatedString(attrs)
 	examples := make(map[string]interface{})
 
 	for _, attr := range attrsArr {
-		example, err := parser.getExampleByInstance(astFile, currTypeSpecDef, attr)
+		example, err := parser.getExampleByInstance(astFile, attr)
 		if err != nil {
 			return nil, err
 		}
@@ -696,7 +684,7 @@ func getBodyParamExamplesByInstanceV3(parser *Parser, currTypeSpecDef *TypeSpecD
 	return examples, nil
 }
 
-func setParamExampleByInstanceV3(parser *Parser, currTypeSpecDef *TypeSpecDef, astFile *ast.File, param *spec.Parameter, attrs string) error {
+func setParamExampleByInstanceV3(parser *Parser, astFile *ast.File, param *spec.Parameter, attrs string) error {
 	if param == nil {
 		return fmt.Errorf("param cannot be nil")
 	}
@@ -704,7 +692,7 @@ func setParamExampleByInstanceV3(parser *Parser, currTypeSpecDef *TypeSpecDef, a
 	attrsArr := splitCommaSeparatedString(attrs)
 
 	for _, attr := range attrsArr {
-		example, err := parser.getExampleByInstance(astFile, currTypeSpecDef, attr)
+		example, err := parser.getExampleByInstance(astFile, attr)
 		if err != nil {
 			return err
 		}
