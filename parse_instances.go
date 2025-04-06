@@ -64,17 +64,15 @@ func (parser *Parser) findPackagePathInImports(pkgName string, imports []*ast.Im
 }
 
 /*
-Ranges through the packages and finds the package path for the package name.
-The `pkgName` should be the package name as it is defined in the package itself,
-and not an alias.
+Finds the package path from the file object. It is expected to be use the same file
+reference that was parsed and stored in the packages object.
 */
-func (parser *Parser) findPackagePathFromPackageName(pkgName string) (string, error) {
-	for pkgPath, pkgDefinition := range parser.packages.packages {
-		if pkgDefinition.Name == pkgName {
-			return pkgPath, nil
-		}
+func (parser *Parser) findPackagePathFromFile(file *ast.File) (string, error) {
+	fileInfo, exists := parser.packages.files[file]
+	if !exists {
+		return "", fmt.Errorf("could not find package path for file: %s", file.Name.Name)
 	}
-	return "", fmt.Errorf("could not find package path for package name: %s", pkgName)
+	return fileInfo.PackagePath, nil
 }
 
 /*
@@ -187,26 +185,61 @@ This function is first used to resolve the value of the example instance. Whenev
 identifier is found, this function is called to resolve it.
 */
 func (parser *Parser) resolveIdentValue(identName string, currTypeDefinition ast.Expr, file *ast.File) (interface{}, bool) {
-		var value interface{}
-		identFound := false
-		ast.Inspect(file, func(n ast.Node) bool {
-			decl, ok := n.(*ast.ValueSpec)
-			if !ok {
-				return true
-			}
-
-			for i, name := range decl.Names {
-				if name.Name == identName && len(decl.Values) > i {
-					value = parser.parseExpr(decl.Values[i], currTypeDefinition, file)
-					identFound = true
-					return false // Stop walking
+	// Check if we're dealing with a qualified identifier like "pkg.SomeVar"
+	if strings.Contains(identName, ".") {
+		parts := strings.Split(identName, ".")
+		pkgName, typeName := parts[0], parts[1]
+		// Try to find all packages that match `pkgName`
+		for astFile := range parser.packages.files {
+			if astFile.Name.Name == pkgName {
+				// Recursively resolve in that file
+				if val, ok := parser.resolveIdentValue(typeName, currTypeDefinition, astFile); ok {
+					return val, true
 				}
 			}
-			return true
-		})
+		}
+		return nil, false // Not found in any matching package
+	}
 
-		return value, identFound
+	var value interface{}
+	identFound := false
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch node := n.(type) {
+
+		case *ast.ValueSpec:
+			for i, name := range node.Names {
+				if name.Name == identName && len(node.Values) > i {
+					value = parser.parseExpr(node.Values[i], currTypeDefinition, file)
+					identFound = true
+					return false
+				}
+			}
+
+		case *ast.GenDecl:
+			if node.Tok != token.VAR && node.Tok != token.CONST {
+				return true
+			}
+			for _, spec := range node.Specs {
+				valSpec, ok := spec.(*ast.ValueSpec)
+				if !ok {
+					continue
+				}
+				for i, name := range valSpec.Names {
+					if name.Name == identName && len(valSpec.Values) > i {
+						value = parser.parseExpr(valSpec.Values[i], currTypeDefinition, file)
+						identFound = true
+						return false
+					}
+				}
+			}
+		}
+		return true
+	})
+
+	return value, identFound
 }
+
 
 /*
 Returns the value of the basic literal based on its kind.
@@ -283,7 +316,7 @@ is a pointer, a selector expression, or a identifier.
 func (parser *Parser) getTypeSchemaFromTypeDefinition(typeDefinition ast.Expr, astFile *ast.File) (ast.Expr, error) {
 	switch castTypeDef := typeDefinition.(type) {
 	case *ast.Ident:
-		pkgPath, _ := parser.findPackagePathFromPackageName(astFile.Name.Name)
+		pkgPath, _ := parser.findPackagePathFromFile(astFile)
 		typeSpecDef, err := parser.getTypeSpecDefFromSchemaNameAndPkgPath(castTypeDef.Name, pkgPath)
 		if err != nil {
 			return nil, fmt.Errorf("error getting type schema from *ast.Ident: %s", err)

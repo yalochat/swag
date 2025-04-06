@@ -529,7 +529,6 @@ func setParamExampleByInstance(parser *Parser, astFile *ast.File, param *spec.Pa
 		return fmt.Errorf("param cannot be nil")
 	}
 
-	
 	example, err := parser.getExampleByInstance(astFile, attr)
 	if err != nil {
 		return err

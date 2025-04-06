@@ -8,6 +8,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-openapi/spec"
@@ -2637,23 +2638,27 @@ func normalizeJSON(input string) string {
 func TestParseParamsSetExampleByInstance(t *testing.T) {
   t.Parallel()
 
-  packagePath := "testdata/param_structs"
-  filePath := packagePath + "/instances.go"
-  src, err := os.ReadFile(filePath)
-  assert.NoError(t, err)
-
-  fileSet := token.NewFileSet()
-  fileAST, err := goparser.ParseFile(fileSet, "", src, goparser.ParseComments)
-  assert.NoError(t, err)
-
   parser := New()
+
+	err := parser.parseFile("github.com/yalochat/swag/v2/testdata/param_structs", "testdata/param_structs/instances.go", nil, ParseModels)
+	assert.NoError(t, err)
+
   err = parser.parseFile("github.com/yalochat/swag/v2/testdata/param_structs", "testdata/param_structs/structs.go", nil, ParseModels)
   assert.NoError(t, err)
 
 	err = parser.parseFile("github.com/yalochat/swag/v2/testdata/param_structs/inner", "testdata/param_structs/inner/inner.go", nil, ParseModels)
   assert.NoError(t, err)
 
+	var astFile *ast.File
+
 	_, err = parser.packages.ParseTypes()
+	for file, fileInfo := range parser.packages.files {
+		if strings.Contains(fileInfo.Path, "instances.go") {
+			astFile = file
+			break
+		}
+	}
+
 	assert.NoError(t, err)
 
   tests := []struct {
@@ -2810,7 +2815,7 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
   for _, tt := range tests {
     t.Run(tt.name, func(t *testing.T) {
       operation := NewOperation(parser)
-      err := operation.ParseComment(tt.comment, fileAST)
+      err := operation.ParseComment(tt.comment, astFile)
       assert.NoError(t, err)
 
       b, _ := json.MarshalIndent(operation.Parameters, "", "    ")
