@@ -111,7 +111,7 @@ parseExpr parses the expression and returns the value based on its type.
 - If the expression type is a basic literal, it will return the value.
 
 - If the expression type is composite literal, it will update the type definition
-associated with it and then recursively parse its elements. 
+associated with it in the case the type in inferred from the context. Then recursively parse its elements. 
 
 - If the expression type is a unary expression, it will return the value of the
 dereferenced expression recursively.
