@@ -506,7 +506,7 @@ func (operation *Operation) parseParamAttribute(comment, objectType, schemaType,
 	return nil
 }
 
-func (operation *Operation) parseResponseAttribute(comment, schemaType string, response *spec.Response, astFile *ast.File) error {
+func (operation *Operation) parseResponseAttribute(comment string, response *spec.Response, astFile *ast.File) error {
 	for attrKey, re := range regexAttributes {
 		attr, err := findAttr(re, comment)
 		if err != nil {
@@ -1089,7 +1089,7 @@ func (operation *Operation) ParseResponseComment(commentLine string, astFile *as
 			resp.WithDescription(http.StatusText(code))
 		}
 
-		operation.parseResponseAttribute(commentLine, strings.TrimSpace(matches[3]), resp, astFile)
+		operation.parseResponseAttribute(commentLine, resp, astFile)
 		operation.AddResponse(code, resp)
 	}
 
