@@ -898,40 +898,43 @@ func findTypeDef(importPath, typeName string) (*ast.TypeSpec, error) {
 
 /*
 Format:
-  @Success <status> <response_type> <data_type> ["description"]?
-  @Success <status> <response_type> <generic_type> [example_func]? ["description"]?
+
+	@Success <status> <response_type> <data_type> ["description"]?
+	@Success <status> <response_type> <generic_type> [example_func]? ["description"]?
 
 Regex Structure:
-  ^
-  ([\w,]+)                     // Group 1: HTTP status(es) (200, 404, 500, etc.)
-  \s+
-  ([\w{}]+)                    // Group 2: Response type ({object}, {array}, etc.)
-  \s+
-  (
-    [\w\-.\\{}=,\[\]\s]*\]     // Generic types (Response[string], map[K]V)
-    [\w\-.\\{}=,\[\]\s]*       // Continuation for nested generics
-    |
-    [\w\-.\\{}=,\[\]]+         // Simple types (pkg.Type)
-  )
-  (?:\s+[^"\s][^"]*)?          // Skip exampleByInstance() and similar
-  \s*
-  (".*)?                       // Group 4: Optional description
+
+	^
+	([\w,]+)                     // Group 1: HTTP status(es) (200, 404, 500, etc.)
+	\s+
+	([\w{}]+)                    // Group 2: Response type ({object}, {array}, etc.)
+	\s+
+	(
+	  [\w\-.\\{}=,\[\]\s]*\]     // Generic types (Response[string], map[K]V)
+	  [\w\-.\\{}=,\[\]\s]*       // Continuation for nested generics
+	  |
+	  [\w\-.\\{}=,\[\]]+         // Simple types (pkg.Type)
+	)
+	(?:\s+[^"\s][^"]*)?          // Skip exampleByInstance() and similar
+	\s*
+	(".*)?                       // Group 4: Optional description
 
 Examples:
-  // Basic
-  @Success 200 {object} pkg.User
-  
-  // With description
-  @Success 200 {object} pkg.User "Success response"
-  
-  // Generic type
-  @Success 200 {object} Response[string, int]
-  
-  // With example (ignored)
-  @Success 200 {object} pkg.User exampleByInstance(...)
-  
-  // Multiple status codes
-  @Success 200,201 {object} pkg.User
+
+	// Basic
+	@Success 200 {object} pkg.User
+
+	// With description
+	@Success 200 {object} pkg.User "Success response"
+
+	// Generic type
+	@Success 200 {object} Response[string, int]
+
+	// With example (ignored)
+	@Success 200 {object} pkg.User exampleByInstance(...)
+
+	// Multiple status codes
+	@Success 200,201 {object} pkg.User
 */
 var responsePattern = regexp.MustCompile(`^([\w,]+)\s+([\w{}]+)\s+([\w\-.\\{}=,\[\]\s]*\][\w\-.\\{}=,\[\]\s]*|[\w\-.\\{}=,\[\]]+)(?:\s+[^"\s][^"]*)?\s*(".*)?`)
 
