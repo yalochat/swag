@@ -696,7 +696,7 @@ func setParamExampleByInstanceV3(parser *Parser, astFile *ast.File, param *spec.
 		if err != nil {
 			return err
 		}
-		
+
 		param.Examples = addExampleToExamplesMap(param.Examples, attr, example)
 	}
 

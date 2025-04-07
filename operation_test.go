@@ -2636,18 +2636,18 @@ func normalizeJSON(input string) string {
 }
 
 func TestParseParamsSetExampleByInstance(t *testing.T) {
-  t.Parallel()
+	t.Parallel()
 
-  parser := New()
+	parser := New()
 
 	err := parser.parseFile("github.com/yalochat/swag/v2/testdata/param_structs", "testdata/param_structs/instances.go", nil, ParseModels)
 	assert.NoError(t, err)
 
-  err = parser.parseFile("github.com/yalochat/swag/v2/testdata/param_structs", "testdata/param_structs/structs.go", nil, ParseModels)
-  assert.NoError(t, err)
+	err = parser.parseFile("github.com/yalochat/swag/v2/testdata/param_structs", "testdata/param_structs/structs.go", nil, ParseModels)
+	assert.NoError(t, err)
 
 	err = parser.parseFile("github.com/yalochat/swag/v2/testdata/param_structs/inner", "testdata/param_structs/inner/inner.go", nil, ParseModels)
-  assert.NoError(t, err)
+	assert.NoError(t, err)
 
 	var astFile *ast.File
 
@@ -2661,13 +2661,13 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
 
 	assert.NoError(t, err)
 
-  tests := []struct {
-    name     string
-    comment  string
-    expected string
-  }{
+	tests := []struct {
+		name     string
+		comment  string
+		expected string
+	}{
 		{
-			name: 	"Parse params with string example by instance",
+			name:    "Parse params with string example by instance",
 			comment: `@Param some_id query string true "Some ID" exampleByInstance(StringExample)`,
 			expected: `[
         {
@@ -2681,7 +2681,7 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
       ]`,
 		},
 		{
-			name: 	"Parse params with int example by instance",
+			name:    "Parse params with int example by instance",
 			comment: `@Param some_id query int true "Some ID" exampleByInstance(IntExample)`,
 			expected: `[
         {
@@ -2695,7 +2695,7 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
       ]`,
 		},
 		{
-			name: 	"Parse params with float example by instance",
+			name:    "Parse params with float example by instance",
 			comment: `@Param some_id query number true "Some ID" exampleByInstance(FloatExample)`,
 			expected: `[
         {
@@ -2708,10 +2708,10 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
         }
       ]`,
 		},
-    {
-      name:    "Parse params with simple struct example by instance",
-      comment: `@Param some_id body FormModel true "Some ID" exampleByInstance(FormModelExample)`,
-      expected: `[
+		{
+			name:    "Parse params with simple struct example by instance",
+			comment: `@Param some_id body FormModel true "Some ID" exampleByInstance(FormModelExample)`,
+			expected: `[
         {
           "example": {
             "b": true,
@@ -2726,11 +2726,11 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
           }
         }
       ]`,
-    },
-    {
-      name:    "Parse params with complex struct example by instance",
-      comment: `@Param some_id body CompositeStruct true "Some ID" exampleByInstance(CompositeStructExample)`,
-      expected: `[
+		},
+		{
+			name:    "Parse params with complex struct example by instance",
+			comment: `@Param some_id body CompositeStruct true "Some ID" exampleByInstance(CompositeStructExample)`,
+			expected: `[
         {
           "example": {
             "arrayExample": [
@@ -2763,11 +2763,11 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
           }
         }
       ]`,
-    },
+		},
 		{
-      name:    "Parse params with struct from outside package - example by instance",
-      comment: `@Param some_id body inner.InnerStruct true "Some ID" exampleByInstance(OutsidePkgExample)`,
-      expected: `[
+			name:    "Parse params with struct from outside package - example by instance",
+			comment: `@Param some_id body inner.InnerStruct true "Some ID" exampleByInstance(OutsidePkgExample)`,
+			expected: `[
         {
           "example": {
             "awesomeField": "awesome",
@@ -2789,11 +2789,11 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
           }
         }
       ]`,
-    },
+		},
 		{
-      name:    "Parse params with embedded struct - example by instance",
-      comment: `@Param some_id body EmbeddedStruct true "Some ID" exampleByInstance(EmbeddedStructExample)`,
-      expected: `[
+			name:    "Parse params with embedded struct - example by instance",
+			comment: `@Param some_id body EmbeddedStruct true "Some ID" exampleByInstance(EmbeddedStructExample)`,
+			expected: `[
         {
           "example": {
             "awesomeField": "awesome",
@@ -2809,17 +2809,17 @@ func TestParseParamsSetExampleByInstance(t *testing.T) {
           }
         }
       ]`,
-    },
-  }
+		},
+	}
 
-  for _, tt := range tests {
-    t.Run(tt.name, func(t *testing.T) {
-      operation := NewOperation(parser)
-      err := operation.ParseComment(tt.comment, astFile)
-      assert.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			operation := NewOperation(parser)
+			err := operation.ParseComment(tt.comment, astFile)
+			assert.NoError(t, err)
 
-      b, _ := json.MarshalIndent(operation.Parameters, "", "    ")
-      assert.Equal(t, normalizeJSON(tt.expected), normalizeJSON(string(b)))
-    })
-  }
+			b, _ := json.MarshalIndent(operation.Parameters, "", "    ")
+			assert.Equal(t, normalizeJSON(tt.expected), normalizeJSON(string(b)))
+		})
+	}
 }

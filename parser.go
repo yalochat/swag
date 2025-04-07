@@ -74,7 +74,7 @@ const (
 	scopeAttrPrefix          = "@scope."
 	stateAttr                = "@state"
 
-	asyncAPIAttr             = "@asyncapi"
+	asyncAPIAttr = "@asyncapi"
 )
 
 // ParseFlag determine what to parse
@@ -1335,7 +1335,6 @@ func addAsyncAPIOperations(parser *Parser, asyncAPIScope *AsyncScope) {
 		parser.asyncAPI.Channels[operation.channel] = channel
 	}
 }
-
 
 func refRouteMethodOp(item *spec.PathItem, method string) (op **spec.Operation) {
 	switch method {

@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	BOOLEAN_STRING_TRUE = "true"
+	BOOLEAN_STRING_TRUE  = "true"
 	BOOLEAN_STRING_FALSE = "false"
 )
 
@@ -111,7 +111,7 @@ parseExpr parses the expression and returns the value based on its type.
 - If the expression type is a basic literal, it will return the value.
 
 - If the expression type is composite literal, it will update the type definition
-associated with it in the case the type in inferred from the context. Then recursively parse its elements. 
+associated with it in the case the type in inferred from the context. Then recursively parse its elements.
 
 - If the expression type is a unary expression, it will return the value of the
 dereferenced expression recursively.
@@ -179,7 +179,7 @@ Resolves the identifier value in the AST file.
 It will walk through the AST to find the declaration of `identName` and return its value.
 An ast.Ident (short for AST Identifier) represents a name used in Go code. It could be the
 name of a variable, a function, a type, a constant, or even a package. Essentially, an ast.
-Ident is any word in Go that serves as a named entity. 
+Ident is any word in Go that serves as a named entity.
 
 This function is first used to resolve the value of the example instance. Whenever a new
 identifier is found, this function is called to resolve it.
@@ -240,7 +240,6 @@ func (parser *Parser) resolveIdentValue(identName string, currTypeDefinition ast
 	return value, identFound
 }
 
-
 /*
 Returns the value of the basic literal based on its kind.
 */
@@ -283,7 +282,7 @@ func (parser *Parser) handleMapCompositeLiteral(literal *ast.CompositeLit, currT
 
 /*
 Handles the parsing of array composite literals. It always uses the same type definition,
-since the array elements types are always the same. It will return a slice of interface{} 
+since the array elements types are always the same. It will return a slice of interface{}
 with the values of the array.
 */
 func (parser *Parser) handleArrayCompositeLiteral(literal *ast.CompositeLit, currTypeDefinition ast.Expr, file *ast.File) []interface{} {
@@ -322,7 +321,7 @@ func (parser *Parser) getTypeSchemaFromTypeDefinition(typeDefinition ast.Expr, a
 			return nil, fmt.Errorf("error getting type schema from *ast.Ident: %s", err)
 		}
 		return typeSpecDef.TypeSpec.Type, nil
-	
+
 	case *ast.SelectorExpr:
 		compositePkg := castTypeDef.X.(*ast.Ident).Name
 		pkgPath, err := parser.findPackagePathInImports(compositePkg, astFile.Imports)
@@ -336,7 +335,7 @@ func (parser *Parser) getTypeSchemaFromTypeDefinition(typeDefinition ast.Expr, a
 		}
 
 		return typeSpecDef.TypeSpec.Type, nil
-	
+
 	case *ast.StarExpr:
 		return parser.getTypeSchemaFromTypeDefinition(castTypeDef.X, astFile)
 
@@ -384,9 +383,9 @@ it will use the field name as the key.
 It will also handle embedded structs by flattening them into the parent struct.
 Returns a map[string]interface{} with the values of the struct.
 */
-func (parser *Parser) handleStructCompositeLiteral(literal *ast.CompositeLit, currTypeDefinition ast.Expr, file *ast.File) interface{} {	
+func (parser *Parser) handleStructCompositeLiteral(literal *ast.CompositeLit, currTypeDefinition ast.Expr, file *ast.File) interface{} {
 	obj := make(map[string]interface{})
-	embeddedKeys := []string{} 
+	embeddedKeys := []string{}
 	for _, compositeElement := range literal.Elts {
 		if keyValueExpr, ok := compositeElement.(*ast.KeyValueExpr); ok {
 			if key, ok := keyValueExpr.Key.(*ast.Ident); ok {

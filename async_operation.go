@@ -22,25 +22,25 @@ const (
 )
 
 const (
-	serverAttr Attribute = "@server"
-	channelAttr Attribute = "@channel"
+	serverAttr    Attribute = "@server"
+	channelAttr   Attribute = "@channel"
 	operationAttr Attribute = "@operation"
 )
 
 const (
-	openAPISchemaPrefix = "#/definitions/"
+	openAPISchemaPrefix  = "#/definitions/"
 	asyncAPISchemaPrefix = "#/components/schemas/"
 )
 
 type AsyncScope struct {
-	parser *Parser
-	servers map[string]*spec.ServersAdditionalProperties
-	channels map[string]*spec.ChannelItem
+	parser     *Parser
+	servers    map[string]*spec.ServersAdditionalProperties
+	channels   map[string]*spec.ChannelItem
 	operations map[string]*OperationWithChannel
 }
 
 type OperationWithChannel struct {
-	action OperationAction
+	action  OperationAction
 	channel string
 	spec.Operation
 }
@@ -52,19 +52,19 @@ func NewAsyncScope(parser *Parser) *AsyncScope {
 	}
 
 	asyncOperation := &AsyncScope{
-		parser:           parser,
-		servers:          make(map[string]*spec.ServersAdditionalProperties),
-		channels:         make(map[string]*spec.ChannelItem),
-		operations:       make(map[string]*OperationWithChannel),
+		parser:     parser,
+		servers:    make(map[string]*spec.ServersAdditionalProperties),
+		channels:   make(map[string]*spec.ChannelItem),
+		operations: make(map[string]*OperationWithChannel),
 	}
 
 	return asyncOperation
 }
 
 // AttributeHandler is a map of attribute to the function that handles the attribute.
-var AttributeHandler = map[Attribute]func(*AsyncScope, *string, string, *ast.File) error {
-	serverAttr:  (*AsyncScope).ParseServerComment,
-	channelAttr: (*AsyncScope).ParseChannelComment,
+var AttributeHandler = map[Attribute]func(*AsyncScope, *string, string, *ast.File) error{
+	serverAttr:    (*AsyncScope).ParseServerComment,
+	channelAttr:   (*AsyncScope).ParseChannelComment,
 	operationAttr: (*AsyncScope).ParseOperationComment,
 }
 
@@ -78,7 +78,7 @@ func (asyncScope *AsyncScope) ParseAsyncAPIComment(funcName *string, comment str
 	fields := FieldsByAnySpace(commentLine, 2)
 	attribute := fields[0]
 	lowerAttribute := strings.ToLower(attribute)
-	
+
 	var lineRemainder string
 	if len(fields) > 1 {
 		lineRemainder = fields[1]
@@ -108,7 +108,7 @@ func (asyncScope *AsyncScope) ParseServerComment(funcName *string, commentLine s
 
 	asyncScope.servers[serverName] = &spec.ServersAdditionalProperties{
 		Server: &spec.Server{
-			URL: host,
+			URL:      host,
 			Protocol: protocol,
 		},
 	}
@@ -124,13 +124,13 @@ func (asyncScope *AsyncScope) ParseChannelComment(funcName *string, commentLine 
 	if len(matches) < 4 {
 		return fmt.Errorf("missing required param comment parameters \"%s\"", commentLine)
 	}
-	
+
 	channelName := matches[1]
 	server := matches[2]
 	description := matches[3]
 
 	asyncScope.channels[channelName] = &spec.ChannelItem{
-		Servers: []string{server},
+		Servers:     []string{server},
 		Description: description,
 	}
 
@@ -138,7 +138,6 @@ func (asyncScope *AsyncScope) ParseChannelComment(funcName *string, commentLine 
 }
 
 var operationCommentPattern = regexp.MustCompile(`(\S+)\s+(\S+)\s+(\S+)\s*(.*)?`)
-
 
 // @operation {operationID} {action} {channel} {message}
 // @operation {action} {channel} {message}

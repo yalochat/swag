@@ -147,32 +147,32 @@ func TestHandleMapCompositeLiteral(t *testing.T) {
 			input: &ast.CompositeLit{
 				Elts: []ast.Expr{
 					&ast.KeyValueExpr{
-						Key:   &ast.BasicLit{Value: `42`, Kind: token.INT},      // int key
+						Key:   &ast.BasicLit{Value: `42`, Kind: token.INT},          // int key
 						Value: &ast.BasicLit{Value: `"value1"`, Kind: token.STRING}, // string value
 					},
 					&ast.KeyValueExpr{
-						Key:   &ast.Ident{Name: "StringExample"}, // this identifier is in the testdata/param_structs/instances.go file
+						Key:   &ast.Ident{Name: "StringExample"},               // this identifier is in the testdata/param_structs/instances.go file
 						Value: &ast.BasicLit{Value: `3.14`, Kind: token.FLOAT}, // float value
 					},
 				},
 			},
 			expected: map[string]interface{}{
-				"42":       `value1`,
+				"42":            `value1`,
 				"AwesomeString": 3.14,
 			},
 		},
 	}
 
 	packagePath := "testdata/param_structs"
-  filePath := packagePath + "/instances.go"
-  src, err := os.ReadFile(filePath)
-  assert.NoError(t, err)
+	filePath := packagePath + "/instances.go"
+	src, err := os.ReadFile(filePath)
+	assert.NoError(t, err)
 
-  fileSet := token.NewFileSet()
-  fileAST, err := goparser.ParseFile(fileSet, "", src, goparser.ParseComments)
-  assert.NoError(t, err)
+	fileSet := token.NewFileSet()
+	fileAST, err := goparser.ParseFile(fileSet, "", src, goparser.ParseComments)
+	assert.NoError(t, err)
 
-  parser := New()
+	parser := New()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

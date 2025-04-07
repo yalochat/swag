@@ -20,10 +20,10 @@ type PathModel struct {
 }
 
 type CompositeStruct struct {
-	FormModelExample *FormModel `json:"formModelExample"`
-	PathModelExample PathModel `json:"pathModelExample"`
-	MapExample map[string]AuthHeader `json:"mapExample"`
-	ArrayExample []FormModel `json:"arrayExample"`
+	FormModelExample *FormModel            `json:"formModelExample"`
+	PathModelExample PathModel             `json:"pathModelExample"`
+	MapExample       map[string]AuthHeader `json:"mapExample"`
+	ArrayExample     []FormModel           `json:"arrayExample"`
 }
 
 type EmbeddedStruct struct {

@@ -9,39 +9,39 @@ var IntExample = 1
 var BoolExample = true
 var FloatExample = 1.1
 
-var FormModelExample = FormModel {
+var FormModelExample = FormModel{
 	Foo: "foo",
-	B: true,
+	B:   true,
 }
 
-var CompositeStructExample = CompositeStruct {
+var CompositeStructExample = CompositeStruct{
 	FormModelExample: &FormModelExample,
-	PathModelExample: PathModel {
+	PathModelExample: PathModel{
 		Identifier: 1,
-		Name: "name",
+		Name:       "name",
 	},
-	MapExample: map[string]AuthHeader {
-		"key": AuthHeader {
-			Token: "token",
+	MapExample: map[string]AuthHeader{
+		"key": {
+			Token:         "token",
 			AnotherHeader: 1,
 		},
 	},
 	ArrayExample: []FormModel{FormModelExample},
 }
 
-var OutsidePkgExample = outsidePkg.InnerStruct {
+var OutsidePkgExample = outsidePkg.InnerStruct{
 	AwesomeField: "awesome",
-	MapField: map[string]int {
-		"key": 1,
+	MapField: map[string]int{
+		"key":  1,
 		"key2": 2,
 	},
-	MapToArray: map[string][]string {
-		"key": {"value1", "value2"},
+	MapToArray: map[string][]string{
+		"key":  {"value1", "value2"},
 		"key2": {"value3", "value4"},
 	},
 }
 
-var EmbeddedStructExample = EmbeddedStruct {
-	FormModel: FormModelExample,
+var EmbeddedStructExample = EmbeddedStruct{
+	FormModel:    FormModelExample,
 	AwesomeField: "awesome",
 }
