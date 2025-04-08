@@ -396,14 +396,13 @@ func (operation *Operation) ParseParamComment(commentLine string, astFile *ast.F
 			if err != nil {
 				return err
 			}
-
 			param.Schema = schema
 		}
 	default:
 		return fmt.Errorf("not supported paramType: %s", paramType)
 	}
 
-	err := operation.parseParamAttribute(commentLine, objectType, refType, paramType, &param)
+	err := operation.parseParamAttribute(commentLine, objectType, refType, paramType, &param, astFile)
 
 	if err != nil {
 		return err
@@ -415,28 +414,29 @@ func (operation *Operation) ParseParamComment(commentLine string, astFile *ast.F
 }
 
 const (
-	formTag             = "form"
-	jsonTag             = "json"
-	uriTag              = "uri"
-	headerTag           = "header"
-	bindingTag          = "binding"
-	defaultTag          = "default"
-	enumsTag            = "enums"
-	exampleTag          = "example"
-	schemaExampleTag    = "schemaExample"
-	formatTag           = "format"
-	titleTag            = "title"
-	validateTag         = "validate"
-	minimumTag          = "minimum"
-	maximumTag          = "maximum"
-	minLengthTag        = "minLength"
-	maxLengthTag        = "maxLength"
-	multipleOfTag       = "multipleOf"
-	readOnlyTag         = "readonly"
-	extensionsTag       = "extensions"
-	collectionFormatTag = "collectionFormat"
-	patternTag          = "pattern"
-	oneOfTag            = "oneOf"
+	formTag              = "form"
+	jsonTag              = "json"
+	uriTag               = "uri"
+	headerTag            = "header"
+	bindingTag           = "binding"
+	defaultTag           = "default"
+	enumsTag             = "enums"
+	exampleTag           = "example"
+	schemaExampleTag     = "schemaExample"
+	formatTag            = "format"
+	titleTag             = "title"
+	validateTag          = "validate"
+	minimumTag           = "minimum"
+	maximumTag           = "maximum"
+	minLengthTag         = "minLength"
+	maxLengthTag         = "maxLength"
+	multipleOfTag        = "multipleOf"
+	readOnlyTag          = "readonly"
+	extensionsTag        = "extensions"
+	collectionFormatTag  = "collectionFormat"
+	patternTag           = "pattern"
+	oneOfTag             = "oneOf"
+	exampleByInstanceTag = "exampleByInstance"
 )
 
 var regexAttributes = map[string]*regexp.Regexp{
@@ -462,9 +462,11 @@ var regexAttributes = map[string]*regexp.Regexp{
 	exampleTag: regexp.MustCompile(`(?i)\s+example\(.*\)`),
 	// schemaExample(0)
 	schemaExampleTag: regexp.MustCompile(`(?i)\s+schemaExample\(.*\)`),
+	// exampleByInstance(instance)
+	exampleByInstanceTag: regexp.MustCompile(`(?i)\s+exampleByInstance\(.*\)`),
 }
 
-func (operation *Operation) parseParamAttribute(comment, objectType, schemaType, paramType string, param *spec.Parameter) error {
+func (operation *Operation) parseParamAttribute(comment, objectType, schemaType, paramType string, param *spec.Parameter, astFile *ast.File) error {
 	schemaType = TransToValidSchemeType(schemaType)
 
 	for attrKey, re := range regexAttributes {
@@ -492,6 +494,8 @@ func (operation *Operation) parseParamAttribute(comment, objectType, schemaType,
 			param.Extensions = setExtensionParam(attr)
 		case collectionFormatTag:
 			err = setCollectionFormatParam(param, attrKey, objectType, attr, comment)
+		case exampleByInstanceTag:
+			err = setParamExampleByInstance(operation.parser, astFile, param, attr)
 		}
 
 		if err != nil {
@@ -499,6 +503,55 @@ func (operation *Operation) parseParamAttribute(comment, objectType, schemaType,
 		}
 	}
 
+	return nil
+}
+
+func (operation *Operation) parseResponseAttribute(comment string, response *spec.Response, astFile *ast.File) error {
+	for attrKey, re := range regexAttributes {
+		attr, err := findAttr(re, comment)
+		if err != nil {
+			continue
+		}
+		switch attrKey {
+		case exampleByInstanceTag:
+			err = setResponseExampleByInstance(operation.parser, astFile, response, attr)
+		}
+
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func setParamExampleByInstance(parser *Parser, astFile *ast.File, param *spec.Parameter, attr string) error {
+	if param == nil {
+		return fmt.Errorf("param cannot be nil")
+	}
+
+	example, err := parser.getExampleByInstance(astFile, attr)
+	if err != nil {
+		return err
+	}
+
+	param.Example = example
+	return nil
+}
+
+func setResponseExampleByInstance(parser *Parser, astFile *ast.File, response *spec.Response, attr string) error {
+	if response == nil {
+		return fmt.Errorf("response cannot be nil")
+	}
+
+	example, err := parser.getExampleByInstance(astFile, attr)
+	if err != nil {
+		return err
+	}
+
+	if response.Examples == nil {
+		response.Examples = make(map[string]interface{})
+	}
+	response.Examples["application/json"] = example
 	return nil
 }
 
@@ -843,7 +896,47 @@ func findTypeDef(importPath, typeName string) (*ast.TypeSpec, error) {
 	return nil, fmt.Errorf("type spec not found")
 }
 
-var responsePattern = regexp.MustCompile(`^([\w,]+)\s+([\w{}]+)\s+([\w\-.\\{}=,\[\s\]]+)\s*(".*)?`)
+/*
+Format:
+
+	@Success <status> <response_type> <data_type> ["description"]?
+	@Success <status> <response_type> <generic_type> [example_func]? ["description"]?
+
+Regex Structure:
+
+	^
+	([\w,]+)                     // Group 1: HTTP status(es) (200, 404, 500, etc.)
+	\s+
+	([\w{}]+)                    // Group 2: Response type ({object}, {array}, etc.)
+	\s+
+	(
+	  [\w\-.\\{}=,\[\]\s]*\]     // Generic types (Response[string], map[K]V)
+	  [\w\-.\\{}=,\[\]\s]*       // Continuation for nested generics
+	  |
+	  [\w\-.\\{}=,\[\]]+         // Simple types (pkg.Type)
+	)
+	(?:\s+[^"\s][^"]*)?          // Skip exampleByInstance() and similar
+	\s*
+	(".*)?                       // Group 4: Optional description
+
+Examples:
+
+	// Basic
+	@Success 200 {object} pkg.User
+
+	// With description
+	@Success 200 {object} pkg.User "Success response"
+
+	// Generic type
+	@Success 200 {object} Response[string, int]
+
+	// With example (ignored)
+	@Success 200 {object} pkg.User exampleByInstance(...)
+
+	// Multiple status codes
+	@Success 200,201 {object} pkg.User
+*/
+var responsePattern = regexp.MustCompile(`^([\w,]+)\s+([\w{}]+)\s+([\w\-.\\{}=,\[\]\s]*\][\w\-.\\{}=,\[\]\s]*|[\w\-.\\{}=,\[\]]+)(?:\s+[^"\s][^"]*)?\s*(".*)?`)
 
 // ResponseType{data1=Type1,data2=Type2}.
 var combinedPattern = regexp.MustCompile(`^([\w\-./\[\]]+){(.*)}$`)
@@ -1036,6 +1129,7 @@ func (operation *Operation) ParseResponseComment(commentLine string, astFile *as
 			resp.WithDescription(http.StatusText(code))
 		}
 
+		operation.parseResponseAttribute(commentLine, resp, astFile)
 		operation.AddResponse(code, resp)
 	}
 

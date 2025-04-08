@@ -74,7 +74,7 @@ const (
 	scopeAttrPrefix          = "@scope."
 	stateAttr                = "@state"
 
-	asyncAPIAttr             = "@asyncapi"
+	asyncAPIAttr = "@asyncapi"
 )
 
 // ParseFlag determine what to parse
@@ -1188,7 +1188,7 @@ func getFuncDoc(decl any) (*ast.CommentGroup, bool) {
 		return astDecl.Doc, ok
 	case *ast.ValueSpec:
 		value, ok := astDecl.Values[0].(*ast.Ident)
-		if !ok || value == nil {
+		if !ok || value == nil || value.Obj == nil {
 			return nil, false
 		}
 		_, ok = getFuncDoc(value.Obj.Decl)
@@ -1335,7 +1335,6 @@ func addAsyncAPIOperations(parser *Parser, asyncAPIScope *AsyncScope) {
 		parser.asyncAPI.Channels[operation.channel] = channel
 	}
 }
-
 
 func refRouteMethodOp(item *spec.PathItem, method string) (op **spec.Operation) {
 	switch method {

@@ -138,7 +138,7 @@ func TestParseOperationComment(t *testing.T) {
 			name:        "parses a valid @operation comment - funcName used as operationID",
 			comment:     `@operation send topic1 model.OrderRow`,
 			expectedErr: "",
-			funcName: 	&funcNameExample,
+			funcName:    &funcNameExample,
 			assertFunc: func(t *testing.T, err error, asyncScope *AsyncScope) {
 				assert.Contains(t, asyncScope.operations, "myOperation")
 				assert.Equal(t, Send, asyncScope.operations["myOperation"].action)

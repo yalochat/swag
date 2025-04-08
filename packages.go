@@ -35,6 +35,9 @@ func NewPackagesDefinitions() *PackagesDefinitions {
 // ParseFile parse a source file.
 func (pkgDefs *PackagesDefinitions) ParseFile(packageDir, path string, src interface{}, flag ParseFlag) error {
 	// positions are relative to FileSet
+	if strings.Contains(path, "salesdesk-api/internal/bot") {
+		fmt.Println("[ParseFile] path", path)
+	}
 	fileSet := token.NewFileSet()
 	astFile, err := goparser.ParseFile(fileSet, path, src, goparser.ParseComments)
 	if err != nil {

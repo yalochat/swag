@@ -1630,6 +1630,7 @@ func TestParseAndExtractionParamAttributeV3(t *testing.T) {
 			"",
 			NUMBER,
 			&numberParam,
+			nil,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, int(0), *numberParam.Schema.Spec.Minimum)
@@ -1637,10 +1638,10 @@ func TestParseAndExtractionParamAttributeV3(t *testing.T) {
 		assert.Equal(t, "csv", numberParam.Schema.Spec.Format)
 		assert.Equal(t, float64(1), numberParam.Schema.Spec.Default)
 
-		err = op.parseParamAttribute(" minlength(1)", "", NUMBER, nil)
+		err = op.parseParamAttribute(" minlength(1)", "", NUMBER, nil, nil)
 		assert.Error(t, err)
 
-		err = op.parseParamAttribute(" maxlength(1)", "", NUMBER, nil)
+		err = op.parseParamAttribute(" maxlength(1)", "", NUMBER, nil, nil)
 		assert.Error(t, err)
 	})
 
@@ -1653,15 +1654,16 @@ func TestParseAndExtractionParamAttributeV3(t *testing.T) {
 			"",
 			STRING,
 			&stringParam,
+			nil,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, int(0), *stringParam.Schema.Spec.MinLength)
 		assert.Equal(t, int(100), *stringParam.Schema.Spec.MaxLength)
 		assert.Equal(t, "csv", stringParam.Schema.Spec.Format)
-		err = op.parseParamAttribute(" minimum(0)", "", STRING, nil)
+		err = op.parseParamAttribute(" minimum(0)", "", STRING, nil, nil)
 		assert.Error(t, err)
 
-		err = op.parseParamAttribute(" maximum(0)", "", STRING, nil)
+		err = op.parseParamAttribute(" maximum(0)", "", STRING, nil, nil)
 		assert.Error(t, err)
 	})
 
@@ -1671,14 +1673,14 @@ func TestParseAndExtractionParamAttributeV3(t *testing.T) {
 		}
 
 		arrayParam.In = "path"
-		err := op.parseParamAttribute(" collectionFormat(simple)", ARRAY, STRING, &arrayParam)
+		err := op.parseParamAttribute(" collectionFormat(simple)", ARRAY, STRING, &arrayParam, nil)
 		assert.Equal(t, "simple", arrayParam.Style)
 		assert.NoError(t, err)
 
-		err = op.parseParamAttribute(" collectionFormat(simple)", STRING, STRING, nil)
+		err = op.parseParamAttribute(" collectionFormat(simple)", STRING, STRING, nil, nil)
 		assert.Error(t, err)
 
-		err = op.parseParamAttribute(" default(0)", "", ARRAY, nil)
+		err = op.parseParamAttribute(" default(0)", "", ARRAY, nil, nil)
 		assert.Error(t, err)
 	})
 }

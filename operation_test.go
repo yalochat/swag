@@ -8,6 +8,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-openapi/spec"
@@ -2044,6 +2045,7 @@ func TestParseAndExtractionParamAttribute(t *testing.T) {
 		NUMBER,
 		"",
 		&numberParam,
+		nil,
 	)
 	assert.NoError(t, err)
 	assert.Equal(t, float64(0), *numberParam.Minimum)
@@ -2051,10 +2053,10 @@ func TestParseAndExtractionParamAttribute(t *testing.T) {
 	assert.Equal(t, "csv", numberParam.SimpleSchema.Format)
 	assert.Equal(t, float64(1), numberParam.Default)
 
-	err = op.parseParamAttribute(" minlength(1)", "", NUMBER, "", nil)
+	err = op.parseParamAttribute(" minlength(1)", "", NUMBER, "", nil, nil)
 	assert.Error(t, err)
 
-	err = op.parseParamAttribute(" maxlength(1)", "", NUMBER, "", nil)
+	err = op.parseParamAttribute(" maxlength(1)", "", NUMBER, "", nil, nil)
 	assert.Error(t, err)
 
 	stringParam := spec.Parameter{}
@@ -2064,26 +2066,27 @@ func TestParseAndExtractionParamAttribute(t *testing.T) {
 		STRING,
 		"",
 		&stringParam,
+		nil,
 	)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), *stringParam.MinLength)
 	assert.Equal(t, int64(100), *stringParam.MaxLength)
 	assert.Equal(t, "csv", stringParam.SimpleSchema.Format)
-	err = op.parseParamAttribute(" minimum(0)", "", STRING, "", nil)
+	err = op.parseParamAttribute(" minimum(0)", "", STRING, "", nil, nil)
 	assert.Error(t, err)
 
-	err = op.parseParamAttribute(" maximum(0)", "", STRING, "", nil)
+	err = op.parseParamAttribute(" maximum(0)", "", STRING, "", nil, nil)
 	assert.Error(t, err)
 
 	arrayParram := spec.Parameter{}
-	err = op.parseParamAttribute(" collectionFormat(tsv)", ARRAY, STRING, "", &arrayParram)
+	err = op.parseParamAttribute(" collectionFormat(tsv)", ARRAY, STRING, "", &arrayParram, nil)
 	assert.Equal(t, "tsv", arrayParram.CollectionFormat)
 	assert.NoError(t, err)
 
-	err = op.parseParamAttribute(" collectionFormat(tsv)", STRING, STRING, "", nil)
+	err = op.parseParamAttribute(" collectionFormat(tsv)", STRING, STRING, "", nil, nil)
 	assert.Error(t, err)
 
-	err = op.parseParamAttribute(" default(0)", "", ARRAY, "", nil)
+	err = op.parseParamAttribute(" default(0)", "", ARRAY, "", nil, nil)
 	assert.NoError(t, err)
 }
 
@@ -2622,4 +2625,201 @@ func TestParseDeprecatedRouter(t *testing.T) {
 	expected, err := os.ReadFile(filepath.Join(searchDir, "expected.json"))
 	assert.NoError(t, err)
 	assert.Equal(t, expected, b)
+}
+
+func normalizeJSON(input string) string {
+	var jsonObj interface{}
+	_ = json.Unmarshal([]byte(input), &jsonObj) // Ignore errors for simplicity
+
+	normalized, _ := json.MarshalIndent(jsonObj, "", "    ") // Always use 4 spaces
+	return string(normalized)
+}
+
+func TestParseParamsSetExampleByInstance(t *testing.T) {
+	t.Parallel()
+
+	parser := New()
+
+	err := parser.parseFile("github.com/yalochat/swag/v2/testdata/param_structs", "testdata/param_structs/instances.go", nil, ParseModels)
+	assert.NoError(t, err)
+
+	err = parser.parseFile("github.com/yalochat/swag/v2/testdata/param_structs", "testdata/param_structs/structs.go", nil, ParseModels)
+	assert.NoError(t, err)
+
+	err = parser.parseFile("github.com/yalochat/swag/v2/testdata/param_structs/inner", "testdata/param_structs/inner/inner.go", nil, ParseModels)
+	assert.NoError(t, err)
+
+	var astFile *ast.File
+
+	_, err = parser.packages.ParseTypes()
+	for file, fileInfo := range parser.packages.files {
+		if strings.Contains(fileInfo.Path, "instances.go") {
+			astFile = file
+			break
+		}
+	}
+
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		comment  string
+		expected string
+	}{
+		{
+			name:    "Parse params with string example by instance",
+			comment: `@Param some_id query string true "Some ID" exampleByInstance(StringExample)`,
+			expected: `[
+        {
+          "example": "AwesomeString",
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "query",
+          "required": true,
+					"type": "string"
+        }
+      ]`,
+		},
+		{
+			name:    "Parse params with int example by instance",
+			comment: `@Param some_id query int true "Some ID" exampleByInstance(IntExample)`,
+			expected: `[
+        {
+          "example": 1,
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "query",
+          "required": true,
+					"type": "integer"
+        }
+      ]`,
+		},
+		{
+			name:    "Parse params with float example by instance",
+			comment: `@Param some_id query number true "Some ID" exampleByInstance(FloatExample)`,
+			expected: `[
+        {
+          "example": 1.1,
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "query",
+          "required": true,
+					"type": "number"
+        }
+      ]`,
+		},
+		{
+			name:    "Parse params with simple struct example by instance",
+			comment: `@Param some_id body FormModel true "Some ID" exampleByInstance(FormModelExample)`,
+			expected: `[
+        {
+          "example": {
+            "b": true,
+            "foo": "foo"
+          },
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "body",
+          "required": true,
+          "schema": {
+            "$ref": "#/definitions/structs.FormModel"
+          }
+        }
+      ]`,
+		},
+		{
+			name:    "Parse params with complex struct example by instance",
+			comment: `@Param some_id body CompositeStruct true "Some ID" exampleByInstance(CompositeStructExample)`,
+			expected: `[
+        {
+          "example": {
+            "arrayExample": [
+              {
+                "b": true,
+                "foo": "foo"
+              }
+            ],
+            "formModelExample": {
+              "b": true,
+              "foo": "foo"
+            },
+            "mapExample": {
+              "key": {
+                "AnotherHeader": 1,
+                "Token": "token"
+              }
+            },
+            "pathModelExample": {
+              "Identifier": 1,
+              "Name": "name"
+            }
+          },
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "body",
+          "required": true,
+          "schema": {
+            "$ref": "#/definitions/structs.CompositeStruct"
+          }
+        }
+      ]`,
+		},
+		{
+			name:    "Parse params with struct from outside package - example by instance",
+			comment: `@Param some_id body inner.InnerStruct true "Some ID" exampleByInstance(OutsidePkgExample)`,
+			expected: `[
+        {
+          "example": {
+            "awesomeField": "awesome",
+            "mapField": {
+              "key": 1,
+              "key2": 2
+            },
+						"mapToArray": {
+						  "key": ["value1", "value2"],
+							"key2": ["value3", "value4"]
+						}
+          },
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "body",
+          "required": true,
+          "schema": {
+            "$ref": "#/definitions/inner.InnerStruct"
+          }
+        }
+      ]`,
+		},
+		{
+			name:    "Parse params with embedded struct - example by instance",
+			comment: `@Param some_id body EmbeddedStruct true "Some ID" exampleByInstance(EmbeddedStructExample)`,
+			expected: `[
+        {
+          "example": {
+            "awesomeField": "awesome",
+						"b": true,
+						"foo": "foo"
+          },
+          "description": "Some ID",
+          "name": "some_id",
+          "in": "body",
+          "required": true,
+          "schema": {
+            "$ref": "#/definitions/structs.EmbeddedStruct"
+          }
+        }
+      ]`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			operation := NewOperation(parser)
+			err := operation.ParseComment(tt.comment, astFile)
+			assert.NoError(t, err)
+
+			b, _ := json.MarshalIndent(operation.Parameters, "", "    ")
+			assert.Equal(t, normalizeJSON(tt.expected), normalizeJSON(string(b)))
+		})
+	}
 }
