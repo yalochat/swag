@@ -1092,6 +1092,8 @@ func (p *Parser) getSchemaByRef(ref *spec.Ref) *spec.Schema {
 	return p.openAPI.Components.Spec.Schemas[searchString].Spec
 }
 
+var multipleUnderscores = regexp.MustCompile(`_+`)
+
 func (p *Parser) getDefinitionNameV3(typeName string, packagePath string) string {
 	// Short circuit if typeName is empty
 	if typeName == "" {
@@ -1113,8 +1115,7 @@ func (p *Parser) getDefinitionNameV3(typeName string, packagePath string) string
 	// Remove unneeded separators.
 	typeName = strings.TrimPrefix(typeName, "_")
 	typeName = strings.TrimSuffix(typeName, "_")
-	re := regexp.MustCompile(`_+`)
-	typeName = re.ReplaceAllString(typeName, "_")
+	typeName = multipleUnderscores.ReplaceAllString(typeName, "_")
 
 	// Look for name collisions.
 	if count, ok := p.definitions[typeName]; ok {
