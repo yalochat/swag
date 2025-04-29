@@ -526,7 +526,7 @@ func TestGetDefinitionNameV3(t *testing.T) {
 		t2 := p.getDefinitionNameV3("test", "test")
 
 		assert.NotEqual(t, t1, t2, "should be different")
-		assert.True(t, strings.HasPrefix(t2, t1), "should be prefixed with %s", t1)
+		assert.Truef(t, strings.HasPrefix(t2, t1), "should be prefixed with %s", t1)
 
 	})
 
