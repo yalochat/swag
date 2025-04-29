@@ -703,7 +703,7 @@ func (p *Parser) ParseDefinitionV3(typeSpecDef *TypeSpecDef) (*SchemaV3, error) 
 		p.debug.Printf("Skipping '%s', recursion detected.", typeName)
 
 		return &SchemaV3{
-				Name:    typeName,
+				Name:    p.getDefinitionNameV3(typeName, typeSpecDef.PkgPath),
 				PkgPath: typeSpecDef.PkgPath,
 				Schema:  PrimitiveSchemaV3(OBJECT).Spec,
 			},
@@ -750,7 +750,7 @@ func (p *Parser) ParseDefinitionV3(typeSpecDef *TypeSpecDef) (*SchemaV3, error) 
 	}
 
 	sch := SchemaV3{
-		Name:    schemaName,
+		Name:    p.getDefinitionNameV3(schemaName, typeSpecDef.PkgPath),
 		PkgPath: typeSpecDef.PkgPath,
 		Schema:  definition.Spec,
 	}
@@ -1090,4 +1090,38 @@ func (p *Parser) GetSchemaTypePathV3(schema *spec.RefOrSpec[spec.Schema], depth 
 func (p *Parser) getSchemaByRef(ref *spec.Ref) *spec.Schema {
 	searchString := strings.ReplaceAll(ref.Ref, "#/components/schemas/", "")
 	return p.openAPI.Components.Spec.Schemas[searchString].Spec
+}
+
+func (p *Parser) getDefinitionNameV3(typeName string, packagePath string) string {
+	// Short circuit if typeName is empty
+	if typeName == "" {
+		return ""
+	}
+
+	// Get the last part of the package path
+	parts := strings.Split(packagePath, "/")
+	for i := len(parts) - 1; i > 0; i-- {
+		oldPackageName := strings.Join(parts[:i], "_")
+		oldPackageName = strings.ReplaceAll(oldPackageName, ".", "_")
+
+		if strings.Contains(typeName, oldPackageName) {
+			typeName = strings.Replace(typeName, oldPackageName, "", 1)
+			break
+		}
+	}
+
+	// Remove unneeded separators.
+	typeName = strings.TrimPrefix(typeName, "_")
+	typeName = strings.TrimSuffix(typeName, "_")
+	re := regexp.MustCompile(`_+`)
+	typeName = re.ReplaceAllString(typeName, "_")
+
+	// Look for name collisions.
+	if count, ok := p.definitions[typeName]; ok {
+		p.definitions[typeName]++
+		return fmt.Sprintf("%s_%d", typeName, count+1)
+	}
+
+	p.definitions[typeName] = 1
+	return typeName
 }
