@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -375,7 +376,7 @@ func TestParseSimpleApiV3(t *testing.T) {
 	path = paths["/FormData"].Spec.Spec.Post.Spec
 	assert.NotNil(t, path)
 	assert.NotNil(t, path.RequestBody)
-	//TODO add asserts
+	// TODO add asserts
 
 	t.Run("Test parse struct oneOf", func(t *testing.T) {
 		t.Parallel()
@@ -514,4 +515,60 @@ func TestParseTypeAlias(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.JSONEq(t, string(expected), string(result))
+}
+
+func TestGetDefinitionNameV3(t *testing.T) {
+	t.Run("Test name collision", func(t *testing.T) {
+		p := &Parser{
+			typeNames: make(map[string]uint),
+		}
+		t1 := p.getDefinitionNameV3("test", "test")
+		t2 := p.getDefinitionNameV3("test", "test")
+
+		assert.NotEqual(t, t1, t2, "should be different")
+		assert.Truef(t, strings.HasPrefix(t2, t1), "should be prefixed with %s", t1)
+
+	})
+
+	tests := []struct {
+		typeName    string
+		packagePath string
+		expected    string
+	}{
+		{
+			typeName:    "",
+			packagePath: "",
+			expected:    "",
+		},
+		{
+			typeName:    "string",
+			packagePath: "",
+			expected:    "string",
+		},
+		{
+			typeName:    "rest.encodedFilter",
+			packagePath: "github.com/yalochat/customer-profiles-api/services/audiences/internal/handlers/rest",
+			expected:    "rest.encodedFilter",
+		},
+		{
+			typeName:    "github_com_yalochat_customer-profiles-api_services_audiences_pkg_contact.Contact",
+			packagePath: "github.com/yalochat/customer-profiles-api/services/audiences/pkg/contact",
+			expected:    "contact.Contact",
+		},
+		{
+			typeName:    "rest.Response-array_github_com_yalochat_customer-profiles-api_services_audiences_pkg_contact_Audience",
+			packagePath: "github.com/yalochat/customer-profiles-api/services/audiences/internal/handlers/rest",
+			expected:    "rest.Response-array_pkg_contact_Audience",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.typeName, func(t *testing.T) {
+			p := &Parser{
+				typeNames: make(map[string]uint),
+			}
+			result := p.getDefinitionNameV3(test.typeName, test.packagePath)
+			assert.Equal(t, test.expected, result)
+		})
+	}
 }
