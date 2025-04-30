@@ -1117,7 +1117,8 @@ func (p *Parser) getDefinitionNameV3(typeName string, packagePath string) string
 	typeName = strings.TrimSuffix(typeName, "_")
 	typeName = multipleUnderscores.ReplaceAllString(typeName, "_")
 
-	// Look for name collisions.
+	// Reconcile conflicting names by adding a number suffix if necessary.
+	// Example: "Foo" -> "Foo_1", "Foo_1" -> "Foo_2"
 	if count, ok := p.definitions[typeName]; ok {
 		p.definitions[typeName]++
 		return fmt.Sprintf("%s_%d", typeName, count+1)
