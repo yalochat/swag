@@ -1119,11 +1119,11 @@ func (p *Parser) getDefinitionNameV3(typeName string, packagePath string) string
 
 	// Reconcile conflicting names by adding a number suffix if necessary.
 	// Example: "Foo" -> "Foo_1", "Foo_1" -> "Foo_2"
-	if count, ok := p.definitions[typeName]; ok {
-		p.definitions[typeName]++
+	if count, ok := p.typeNames[typeName]; ok {
+		p.typeNames[typeName]++
 		return fmt.Sprintf("%s_%d", typeName, count+1)
 	}
 
-	p.definitions[typeName] = 1
+	p.typeNames[typeName] = 1
 	return typeName
 }

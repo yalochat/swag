@@ -520,7 +520,7 @@ func TestParseTypeAlias(t *testing.T) {
 func TestGetDefinitionNameV3(t *testing.T) {
 	t.Run("Test name collision", func(t *testing.T) {
 		p := &Parser{
-			definitions: make(map[string]uint),
+			typeNames: make(map[string]uint),
 		}
 		t1 := p.getDefinitionNameV3("test", "test")
 		t2 := p.getDefinitionNameV3("test", "test")
@@ -565,7 +565,7 @@ func TestGetDefinitionNameV3(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.typeName, func(t *testing.T) {
 			p := &Parser{
-				definitions: make(map[string]uint),
+				typeNames: make(map[string]uint),
 			}
 			result := p.getDefinitionNameV3(test.typeName, test.packagePath)
 			assert.Equal(t, test.expected, result)

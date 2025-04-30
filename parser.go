@@ -208,8 +208,8 @@ type Parser struct {
 	// use new openAPI version
 	openAPIVersion bool
 
-	// use the definition hash to resolve conflicts
-	definitions map[string]uint
+	// use the typeNames hash to resolve conflicts
+	typeNames map[string]uint
 }
 
 // FieldParserFactory create FieldParser.
@@ -288,7 +288,7 @@ func New(options ...func(*Parser)) *Parser {
 				Schemas: make(map[string]map[string]interface{}),
 			},
 		},
-		definitions: make(map[string]uint),
+		typeNames: make(map[string]uint),
 	}
 
 	for _, option := range options {
