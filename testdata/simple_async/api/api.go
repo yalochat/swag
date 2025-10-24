@@ -1,8 +1,7 @@
 package api
 
-
 type MyMessage struct {
-	Message string
+	Message   string
 	MessageID int
 }
 

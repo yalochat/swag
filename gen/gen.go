@@ -292,7 +292,7 @@ func processAsyncAPIChannels(asyncAPI *asyncSpec.AsyncAPI) error {
 		}
 
 		reflector.AddChannel(asyncReflector.ChannelInfo{
-			Name:           channelName,
+			Name:            channelName,
 			BaseChannelItem: &channel,
 		})
 	}
