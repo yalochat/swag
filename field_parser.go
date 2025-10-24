@@ -187,7 +187,6 @@ type structField struct {
 	enums        []interface{}
 	enumVarNames []interface{}
 	unique       bool
-	pattern      string
 }
 
 // splitNotWrapped slices s into all substrings separated by sep if sep is not
