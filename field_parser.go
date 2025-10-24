@@ -628,7 +628,7 @@ func parseEnumTags(enumTag string, field *structField) error {
 			if enumValueEqual(e, value) {
 				// skip duplicate enum value
 				foundDuplicate = true
-				continue
+				break
 			}
 		}
 
