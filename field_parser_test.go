@@ -191,11 +191,11 @@ func TestDefaultFieldParser(t *testing.T) {
 		err := newTagBaseFieldParser(
 			&Parser{},
 			&ast.Field{Tag: &ast.BasicLit{
-				Value: `json:"test" enums:"a,b,c,c,c,c"`,
+				Value: `json:"test" enums:"a,b,c,c,c,c,d,e"`,
 			}},
 		).ComplementSchema(&schema)
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{"a", "b", "c"}, schema.Enum)
+		assert.Equal(t, []interface{}{"a", "b", "c", "d", "e"}, schema.Enum)
 	})
 
 	t.Run("EnumVarNames tag", func(t *testing.T) {
