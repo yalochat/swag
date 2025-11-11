@@ -13,7 +13,7 @@ import (
 	"github.com/go-openapi/spec"
 )
 
-var _ FieldParser = &tagBaseFieldParser{p: nil, field: nil, tag: ""}
+var _ FieldParser = (*tagBaseFieldParser)(nil)
 
 const (
 	requiredLabel    = "required"
@@ -573,6 +573,29 @@ func parseValidTags(validTag string, sf *structField) {
 	}
 }
 
+// enumValueEqual efficiently compares primitive types and falls back to reflect.DeepEqual for others.
+func enumValueEqual(a, b interface{}) bool {
+	switch va := a.(type) {
+	case string:
+		vb, ok := b.(string)
+		return ok && va == vb
+	case int:
+		vb, ok := b.(int)
+		return ok && va == vb
+	case int64:
+		vb, ok := b.(int64)
+		return ok && va == vb
+	case float64:
+		vb, ok := b.(float64)
+		return ok && va == vb
+	case bool:
+		vb, ok := b.(bool)
+		return ok && va == vb
+	default:
+		return reflect.DeepEqual(a, b)
+	}
+}
+
 func parseEnumTags(enumTag string, field *structField) error {
 	enumType := field.schemaType
 	if field.schemaType == ARRAY {
@@ -585,6 +608,18 @@ func parseEnumTags(enumTag string, field *structField) error {
 		value, err := defineType(enumType, e)
 		if err != nil {
 			return err
+		}
+
+		foundDuplicate := false
+		for _, e := range field.enums {
+			if enumValueEqual(e, value) {
+				foundDuplicate = true
+				break
+			}
+		}
+
+		if foundDuplicate {
+			continue
 		}
 
 		field.enums = append(field.enums, value)

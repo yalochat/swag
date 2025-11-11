@@ -1216,7 +1216,6 @@ func addAsyncAPIOperations(parser *Parser, asyncAPIScope *AsyncScope) {
 	}
 }
 
-
 func refRouteMethodOp(item *spec.PathItem, method string) (op **spec.Operation) {
 	switch method {
 	case http.MethodGet:
