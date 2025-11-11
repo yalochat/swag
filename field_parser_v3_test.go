@@ -180,6 +180,22 @@ func TestDefaultFieldParserV3(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("Enums tag remove duplication", func(t *testing.T) {
+		t.Parallel()
+
+		schema := spec.NewSchemaSpec()
+		schema.Spec.Type = &spec.SingleOrArray[string]{STRING}
+		err := newTagBaseFieldParserV3(
+			&Parser{},
+			&ast.File{Name: &ast.Ident{Name: "test"}},
+			&ast.Field{Tag: &ast.BasicLit{
+				Value: `json:"test" enums:"a,b,c,a"`,
+			}},
+		).ComplementSchema(schema)
+		assert.NoError(t, err)
+		assert.Equal(t, []interface{}{"a", "b", "c"}, schema.Spec.Enum)
+	})
+
 	t.Run("Enums tag twice", func(t *testing.T) {
 		t.Parallel()
 

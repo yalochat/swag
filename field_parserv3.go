@@ -381,6 +381,19 @@ func (ps *tagBaseFieldParserV3) complementSchema(schema *spec.Schema, types []st
 	elemSchema.Pattern = field.pattern
 	elemSchema.OneOf = oneOfSchemas
 
+	// remove duplicates in Enum
+	if len(elemSchema.Enum) > 0 {
+		uniqueEnums := []interface{}{}
+		enumMap := make(map[interface{}]bool)
+		for _, enumValue := range elemSchema.Enum {
+			if _, exists := enumMap[enumValue]; !exists {
+				enumMap[enumValue] = true
+				uniqueEnums = append(uniqueEnums, enumValue)
+			}
+		}
+		elemSchema.Enum = uniqueEnums
+	}
+
 	return nil
 }
 
