@@ -205,7 +205,7 @@ func (g *Gen) Build(config *Config) error {
 		}
 	}
 
-	g.debug.Printf("Generate swagger docs....")
+	g.debug.Printf("Generate swagger docs.... (Version v2)")
 
 	p := swag.New(
 		swag.SetParseDependency(config.ParseDependency),
