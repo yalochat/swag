@@ -55,6 +55,7 @@ func (pkgDefs *PackagesDefinitions) getTypeFromGenericParam(genericParam string,
 					Elt: expr,
 				},
 			},
+			File:       file,
 			Enums:      typeSpecDef.Enums,
 			PkgPath:    typeSpecDef.PkgPath,
 			ParentSpec: typeSpecDef.ParentSpec,
@@ -91,6 +92,7 @@ func (pkgDefs *PackagesDefinitions) getTypeFromGenericParam(genericParam string,
 					Value: expr,
 				},
 			},
+			File:       file,
 			Enums:      typeSpecDef.Enums,
 			PkgPath:    typeSpecDef.PkgPath,
 			ParentSpec: typeSpecDef.ParentSpec,
@@ -329,12 +331,17 @@ func getExtendedGenericFieldType(file *ast.File, field ast.Expr, genericParamTyp
 			return fieldType.Name, nil
 		}
 
-		tSpec := &TypeSpecDef{
-			File:     file,
-			TypeSpec: fieldType.Obj.Decl.(*ast.TypeSpec),
-			PkgPath:  file.Name.Name,
+		// Safely handle Obj.Decl which might not be *ast.TypeSpec
+		if typeSpec, ok := fieldType.Obj.Decl.(*ast.TypeSpec); ok {
+			tSpec := &TypeSpecDef{
+				File:     file,
+				TypeSpec: typeSpec,
+				PkgPath:  file.Name.Name,
+			}
+			return tSpec.TypeName(), nil
 		}
-		return tSpec.TypeName(), nil
+		// If Decl is not a TypeSpec (e.g., it's an *ast.Field), just return the name
+		return fieldType.Name, nil
 	default:
 		return getFieldType(file, field, genericParamTypeDefs)
 	}
@@ -398,19 +405,34 @@ func getGenericTypeName(file *ast.File, field ast.Expr) (string, error) {
 			return fieldType.Name, nil
 		}
 
-		tSpec := &TypeSpecDef{
-			File:     file,
-			TypeSpec: fieldType.Obj.Decl.(*ast.TypeSpec),
-			PkgPath:  file.Name.Name,
+		// Safely handle Obj.Decl which might not be *ast.TypeSpec
+		if typeSpec, ok := fieldType.Obj.Decl.(*ast.TypeSpec); ok {
+			tSpec := &TypeSpecDef{
+				File:     file,
+				TypeSpec: typeSpec,
+				PkgPath:  file.Name.Name,
+			}
+			return tSpec.TypeName(), nil
 		}
-		return tSpec.TypeName(), nil
+		// If Decl is not a TypeSpec (e.g., it's an *ast.Field), just return the name
+		return fieldType.Name, nil
 	case *ast.ArrayType:
-		tSpec := &TypeSpecDef{
-			File:     file,
-			TypeSpec: fieldType.Elt.(*ast.Ident).Obj.Decl.(*ast.TypeSpec),
-			PkgPath:  file.Name.Name,
+		// Safely handle nested type assertions
+		if ident, ok := fieldType.Elt.(*ast.Ident); ok {
+			if ident.Obj != nil {
+				if typeSpec, ok := ident.Obj.Decl.(*ast.TypeSpec); ok {
+					tSpec := &TypeSpecDef{
+						File:     file,
+						TypeSpec: typeSpec,
+						PkgPath:  file.Name.Name,
+					}
+					return tSpec.TypeName(), nil
+				}
+			}
+			// If we can't get the TypeSpec, just return the ident name
+			return ident.Name, nil
 		}
-		return tSpec.TypeName(), nil
+		return "", fmt.Errorf("array element type is not an identifier: %T", fieldType.Elt)
 	case *ast.SelectorExpr:
 		return fmt.Sprintf("%s.%s", fieldType.X.(*ast.Ident).Name, fieldType.Sel.Name), nil
 	}
